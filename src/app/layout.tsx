@@ -5,6 +5,14 @@ import Sidebar from "@/components/Sidebar";
 export const metadata: Metadata = {
   title: "OneFlow | Social Dashboard",
   description: "Správa sociálních sítí pro OneFlow",
+  robots: {
+    index: false,
+    follow: false,
+    googleBot: {
+      index: false,
+      follow: false,
+    },
+  },
 };
 
 export default function RootLayout({

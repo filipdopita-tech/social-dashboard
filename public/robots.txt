@@ -1,0 +1,4 @@
+User-agent: *
+Disallow: /
+
+# Interni nastroj - neindexovat
