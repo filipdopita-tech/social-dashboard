@@ -1,129 +1,160 @@
 "use client";
 
-import { useMemo } from "react";
+import { getPlatformColor } from "./PlatformIcon";
 
-interface CalendarItem {
+interface QueueItem {
   id: string;
   datum: string;
   cas: string;
   platforma: string;
+  typ: string;
   caption: string;
+  mediaFile: string;
   status: string;
 }
 
 interface CalendarViewProps {
-  items: CalendarItem[];
+  items: QueueItem[];
   currentMonth: Date;
   onPrevMonth: () => void;
   onNextMonth: () => void;
 }
 
+const DAYS_CS = ["Po", "Út", "St", "Čt", "Pá", "So", "Ne"];
+const MONTHS_CS = [
+  "Leden", "Únor", "Březen", "Duben", "Květen", "Červen",
+  "Červenec", "Srpen", "Září", "Říjen", "Listopad", "Prosinec"
+];
+
 export default function CalendarView({ items, currentMonth, onPrevMonth, onNextMonth }: CalendarViewProps) {
-  const days = useMemo(() => {
-    const year = currentMonth.getFullYear();
-    const month = currentMonth.getMonth();
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    
-    // Monday = 0 adjustment for Czech calendar
-    let startOffset = firstDay.getDay() - 1;
-    if (startOffset < 0) startOffset = 6;
-
-    const result: Array<{ date: Date | null; items: CalendarItem[] }> = [];
-
-    // Empty cells before first day
-    for (let i = 0; i < startOffset; i++) {
-      result.push({ date: null, items: [] });
-    }
-
-    // Days of the month
-    for (let d = 1; d <= lastDay.getDate(); d++) {
-      const date = new Date(year, month, d);
-      const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-      const dayItems = items.filter((i) => i.datum === dateStr);
-      result.push({ date, items: dayItems });
-    }
-
-    return result;
-  }, [items, currentMonth]);
-
-  const monthNames = [
-    "Leden", "Únor", "Březen", "Duben", "Květen", "Červen",
-    "Červenec", "Srpen", "Září", "Říjen", "Listopad", "Prosinec",
-  ];
-
-  const dayNames = ["Po", "Út", "St", "Čt", "Pá", "So", "Ne"];
+  const year = currentMonth.getFullYear();
+  const month = currentMonth.getMonth();
   const today = new Date();
-  const isToday = (date: Date | null) =>
-    date !== null &&
-    date.getDate() === today.getDate() &&
-    date.getMonth() === today.getMonth() &&
-    date.getFullYear() === today.getFullYear();
 
-  const statusColors: Record<string, string> = {
-    pending: "bg-amber-500",
-    scheduled: "bg-blue-500",
-    posted: "bg-emerald-500",
-  };
+  // First day of month (0=Sunday, adjust to Monday-first)
+  const firstDay = new Date(year, month, 1);
+  let startDow = firstDay.getDay(); // 0=Sun
+  // convert to Monday-first: Mon=0..Sun=6
+  startDow = (startDow + 6) % 7;
+
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const totalCells = Math.ceil((startDow + daysInMonth) / 7) * 7;
+
+  // Group items by date
+  const byDate: Record<string, QueueItem[]> = {};
+  for (const item of items) {
+    if (!item.datum) continue;
+    if (!byDate[item.datum]) byDate[item.datum] = [];
+    byDate[item.datum].push(item);
+  }
+
+  const cells: (number | null)[] = [];
+  for (let i = 0; i < totalCells; i++) {
+    const dayNum = i - startDow + 1;
+    cells.push(dayNum >= 1 && dayNum <= daysInMonth ? dayNum : null);
+  }
 
   return (
-    <div className="card">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-lg font-semibold text-dark-100">Kalendář příspěvků</h2>
-        <div className="flex items-center gap-2">
-          <button onClick={onPrevMonth} className="btn-secondary !py-1.5 !px-3 text-sm">
-            &larr;
+    <div style={{ background: "#111113", border: "1px solid #1e1e22", borderRadius: 12, overflow: "hidden" }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 24px", borderBottom: "1px solid #1e1e22" }}>
+        <h2 style={{ fontSize: 16, fontWeight: 600, color: "#f0f0f0" }}>
+          {MONTHS_CS[month]} {year}
+        </h2>
+        <div style={{ display: "flex", gap: 4 }}>
+          <button
+            onClick={onPrevMonth}
+            style={{ width: 32, height: 32, borderRadius: 6, border: "1px solid #1e1e22", background: "transparent", color: "#888", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M15 18l-6-6 6-6" />
+            </svg>
           </button>
-          <span className="text-dark-200 font-medium min-w-[140px] text-center">
-            {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
-          </span>
-          <button onClick={onNextMonth} className="btn-secondary !py-1.5 !px-3 text-sm">
-            &rarr;
+          <button
+            onClick={onNextMonth}
+            style={{ width: 32, height: 32, borderRadius: 6, border: "1px solid #1e1e22", background: "transparent", color: "#888", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M9 18l6-6-6-6" />
+            </svg>
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-7 gap-1">
-        {dayNames.map((d) => (
-          <div key={d} className="text-center text-dark-500 text-xs font-medium py-2">
+      {/* Day headers */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", borderBottom: "1px solid #1e1e22" }}>
+        {DAYS_CS.map((d) => (
+          <div key={d} style={{ padding: "8px 4px", textAlign: "center", fontSize: 11, color: "#555", fontWeight: 600, letterSpacing: "0.04em" }}>
             {d}
           </div>
         ))}
-        {days.map((day, idx) => (
-          <div
-            key={idx}
-            className={`min-h-[80px] p-1.5 rounded-lg text-sm ${
-              day.date === null
-                ? "bg-transparent"
-                : isToday(day.date)
-                ? "bg-primary-600/10 border border-primary-500/30"
-                : "bg-dark-800/50 border border-dark-700/50"
-            }`}
-          >
-            {day.date && (
-              <>
-                <div className={`text-xs mb-1 ${isToday(day.date) ? "text-primary-400 font-bold" : "text-dark-400"}`}>
-                  {day.date.getDate()}
-                </div>
-                <div className="space-y-0.5">
-                  {day.items.slice(0, 3).map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex items-center gap-1"
-                      title={`${item.platforma}: ${item.caption.substring(0, 50)}`}
-                    >
-                      <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${statusColors[item.status] || "bg-gray-500"}`} />
-                      <span className="text-[10px] text-dark-300 truncate">
-                        {item.cas} {item.platforma}
-                      </span>
-                    </div>
-                  ))}
-                  {day.items.length > 3 && (
-                    <span className="text-[10px] text-dark-500">+{day.items.length - 3} dalších</span>
-                  )}
-                </div>
-              </>
-            )}
+      </div>
+
+      {/* Grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)" }}>
+        {cells.map((day, idx) => {
+          if (day === null) {
+            return <div key={`empty-${idx}`} style={{ minHeight: 80, borderRight: (idx + 1) % 7 !== 0 ? "1px solid #1a1a1e" : "none", borderBottom: "1px solid #1a1a1e" }} />;
+          }
+          const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+          const dayItems = byDate[dateStr] || [];
+          const isToday = today.getFullYear() === year && today.getMonth() === month && today.getDate() === day;
+
+          return (
+            <div
+              key={dateStr}
+              style={{
+                minHeight: 80,
+                padding: "6px 6px 4px",
+                borderRight: (idx + 1) % 7 !== 0 ? "1px solid #1a1a1e" : "none",
+                borderBottom: "1px solid #1a1a1e",
+                background: isToday ? "rgba(201, 169, 110, 0.04)" : "transparent",
+              }}
+            >
+              <div style={{
+                width: 22, height: 22, borderRadius: "50%",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 12, fontWeight: isToday ? 700 : 400,
+                color: isToday ? "#c9a96e" : "#666",
+                background: isToday ? "rgba(201, 169, 110, 0.12)" : "transparent",
+                marginBottom: 3,
+              }}>
+                {day}
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                {dayItems.slice(0, 3).map((item) => (
+                  <div
+                    key={item.id}
+                    title={`${item.cas} – ${item.platforma}: ${item.caption}`}
+                    style={{
+                      height: 5,
+                      borderRadius: 3,
+                      background: getPlatformColor(item.platforma),
+                      opacity: item.status === "posted" ? 0.4 : 0.85,
+                    }}
+                  />
+                ))}
+                {dayItems.length > 3 && (
+                  <div style={{ fontSize: 9, color: "#555", textAlign: "center" }}>+{dayItems.length - 3}</div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Legend */}
+      <div style={{ padding: "12px 24px", borderTop: "1px solid #1e1e22", display: "flex", gap: 16, flexWrap: "wrap" }}>
+        {[
+          { label: "Facebook", color: "#1877F2" },
+          { label: "Instagram", color: "#E1306C" },
+          { label: "LinkedIn", color: "#0A66C2" },
+          { label: "TikTok", color: "#FF0050" },
+          { label: "YouTube", color: "#FF0000" },
+        ].map((p) => (
+          <div key={p.label} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            <div style={{ width: 8, height: 8, borderRadius: 2, background: p.color }} />
+            <span style={{ fontSize: 11, color: "#555" }}>{p.label}</span>
           </div>
         ))}
       </div>

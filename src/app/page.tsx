@@ -3,6 +3,8 @@
 import { useEffect, useState, useCallback } from "react";
 import StatCard from "@/components/StatCard";
 import CalendarView from "@/components/CalendarView";
+import { PlatformIcon, getPlatformColor } from "@/components/PlatformIcon";
+import StatusBadge from "@/components/StatusBadge";
 
 interface Stats {
   total: number;
@@ -23,6 +25,8 @@ interface QueueItem {
   mediaFile: string;
   status: string;
 }
+
+const PLATFORM_GROUPS = ["Facebook", "Instagram", "LinkedIn", "TikTok", "YouTube Shorts"];
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<Stats | null>(null);
@@ -53,121 +57,124 @@ export default function DashboardPage() {
 
   const upcomingItems = items
     .filter((i) => i.status !== "posted")
-    .sort((a, b) => {
-      const dateA = `${a.datum} ${a.cas}`;
-      const dateB = `${b.datum} ${b.cas}`;
-      return dateA.localeCompare(dateB);
-    })
-    .slice(0, 5);
+    .sort((a, b) => `${a.datum} ${a.cas}`.localeCompare(`${b.datum} ${b.cas}`))
+    .slice(0, 7);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-10 h-10 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-dark-400">Načítám data...</p>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{
+            width: 40, height: 40, border: "2px solid #c9a96e",
+            borderTopColor: "transparent", borderRadius: "50%",
+            animation: "spin 0.8s linear infinite", margin: "0 auto 16px",
+          }} />
+          <p style={{ color: "#555", fontSize: 14 }}>Načítám data...</p>
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>
       </div>
     );
   }
 
+  const platformStats = PLATFORM_GROUPS.map((p) => ({
+    name: p,
+    count: items.filter((i) => i.platforma === p).length,
+    color: getPlatformColor(p),
+  })).filter((p) => p.count > 0);
+
   return (
-    <div className="space-y-8 pt-4">
+    <div style={{ display: "flex", flexDirection: "column", gap: 28, paddingTop: 8 }}>
+      {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-dark-100">Dashboard</h1>
-        <p className="text-dark-400 mt-1">Přehled sociálních sítí OneFlow</p>
+        <h1 style={{ fontSize: 24, fontWeight: 700, color: "#f0f0f0", marginBottom: 4 }}>Dashboard</h1>
+        <p style={{ color: "#555", fontSize: 14 }}>Přehled sociálních sítí OneFlow</p>
       </div>
 
       {/* Stats grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        <StatCard
-          label="Celkem"
-          value={stats?.total || 0}
-          icon="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-          color="purple"
-        />
-        <StatCard
-          label="Čeká"
-          value={stats?.pending || 0}
-          icon="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-          color="amber"
-          subtitle="K zpracování"
-        />
-        <StatCard
-          label="Naplánováno"
-          value={stats?.scheduled || 0}
-          icon="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-          color="blue"
-          subtitle="Připraveno"
-        />
-        <StatCard
-          label="Zveřejněno"
-          value={stats?.posted || 0}
-          icon="M5 13l4 4L19 7"
-          color="emerald"
-          subtitle="Hotovo"
-        />
-        <StatCard
-          label="Dnes"
-          value={stats?.todayPosts || 0}
-          icon="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707"
-          color="rose"
-          subtitle="Dnešní příspěvky"
-        />
-        <StatCard
-          label="Tento týden"
-          value={stats?.weekPosts || 0}
-          icon="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-          color="blue"
-          subtitle="Nadcházejících 7 dní"
-        />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 12 }}>
+        <StatCard label="Celkem" value={stats?.total ?? 0} accent />
+        <StatCard label="Čeká" value={stats?.pending ?? 0} subtitle="Ke zpracování" />
+        <StatCard label="Naplánováno" value={stats?.scheduled ?? 0} subtitle="Připraveno" />
+        <StatCard label="Zveřejněno" value={stats?.posted ?? 0} subtitle="Hotovo" />
+        <StatCard label="Dnes" value={stats?.todayPosts ?? 0} subtitle="Dnešní příspěvky" />
+        <StatCard label="Tento týden" value={stats?.weekPosts ?? 0} subtitle="Nadcházejících 7 dní" />
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* Calendar */}
-        <div className="xl:col-span-2">
-          <CalendarView
-            items={items}
-            currentMonth={currentMonth}
-            onPrevMonth={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))}
-            onNextMonth={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))}
-          />
-        </div>
+      {/* Calendar + Upcoming */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 20 }} className="calendar-grid">
+        <CalendarView
+          items={items}
+          currentMonth={currentMonth}
+          onPrevMonth={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))}
+          onNextMonth={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))}
+        />
 
-        {/* Upcoming */}
-        <div className="card">
-          <h2 className="text-lg font-semibold text-dark-100 mb-4">Nadcházející příspěvky</h2>
-          {upcomingItems.length === 0 ? (
-            <p className="text-dark-500 text-sm">Žádné nadcházející příspěvky</p>
-          ) : (
-            <div className="space-y-3">
-              {upcomingItems.map((item) => (
-                <div key={item.id} className="bg-dark-800/50 border border-dark-700/50 rounded-lg p-3">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <div className="flex items-center gap-2">
-                      <span className={`text-xs font-medium ${
-                        item.platforma === "Instagram" ? "text-pink-400" :
-                        item.platforma === "Facebook" ? "text-blue-400" : "text-purple-400"
-                      }`}>
-                        {item.platforma}
-                      </span>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full ${
-                        item.status === "pending" ? "bg-amber-500/20 text-amber-400" :
-                        item.status === "scheduled" ? "bg-blue-500/20 text-blue-400" :
-                        "bg-emerald-500/20 text-emerald-400"
-                      }`}>
-                        {item.status === "pending" ? "Čeká" : item.status === "scheduled" ? "Naplánováno" : "Zveřejněno"}
-                      </span>
+        {/* Right panel */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {/* Upcoming */}
+          <div style={{ background: "#111113", border: "1px solid #1e1e22", borderRadius: 12, padding: 20, flex: 1 }}>
+            <h2 style={{ fontSize: 14, fontWeight: 600, color: "#f0f0f0", marginBottom: 14 }}>
+              Nadcházející příspěvky
+            </h2>
+            {upcomingItems.length === 0 ? (
+              <p style={{ color: "#444", fontSize: 13 }}>Žádné naplánované příspěvky</p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {upcomingItems.map((item) => (
+                  <div key={item.id} style={{
+                    background: "#0a0a0b",
+                    border: "1px solid #1e1e22",
+                    borderRadius: 8,
+                    padding: "10px 12px",
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <PlatformIcon platform={item.platforma} size={14} />
+                        <span style={{ fontSize: 11, color: getPlatformColor(item.platforma), fontWeight: 500 }}>
+                          {item.platforma}
+                        </span>
+                      </div>
+                      <StatusBadge status={item.status} />
                     </div>
-                    <span className="text-dark-500 text-xs">{item.datum} {item.cas}</span>
+                    <p style={{ fontSize: 12, color: "#aaa", margin: "0 0 4px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                      {item.caption || "Bez popisku"}
+                    </p>
+                    <div style={{ fontSize: 11, color: "#444" }}>{item.datum} {item.cas}</div>
                   </div>
-                  <p className="text-dark-300 text-sm line-clamp-2">{item.caption || "Bez popisku"}</p>
-                </div>
-              ))}
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Platform breakdown */}
+          {platformStats.length > 0 && (
+            <div style={{ background: "#111113", border: "1px solid #1e1e22", borderRadius: 12, padding: 20 }}>
+              <h2 style={{ fontSize: 14, fontWeight: 600, color: "#f0f0f0", marginBottom: 14 }}>
+                Platformy
+              </h2>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {platformStats.map((p) => (
+                  <div key={p.name} style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <PlatformIcon platform={p.name} size={16} />
+                      <span style={{ fontSize: 13, color: "#aaa" }}>{p.name}</span>
+                    </div>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: p.color }}>{p.count}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
       </div>
+
+      <style>{`
+        @media (max-width: 900px) {
+          .calendar-grid {
+            grid-template-columns: 1fr !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }

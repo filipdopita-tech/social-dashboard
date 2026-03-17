@@ -1,60 +1,42 @@
 interface StatCardProps {
   label: string;
   value: number | string;
-  icon: string;
-  color: "blue" | "amber" | "emerald" | "purple" | "rose";
   subtitle?: string;
+  accent?: boolean;
 }
 
-const colorMap = {
-  blue: {
-    bg: "bg-blue-500/10",
-    text: "text-blue-400",
-    border: "border-blue-500/20",
-    iconBg: "bg-blue-500/20",
-  },
-  amber: {
-    bg: "bg-amber-500/10",
-    text: "text-amber-400",
-    border: "border-amber-500/20",
-    iconBg: "bg-amber-500/20",
-  },
-  emerald: {
-    bg: "bg-emerald-500/10",
-    text: "text-emerald-400",
-    border: "border-emerald-500/20",
-    iconBg: "bg-emerald-500/20",
-  },
-  purple: {
-    bg: "bg-purple-500/10",
-    text: "text-purple-400",
-    border: "border-purple-500/20",
-    iconBg: "bg-purple-500/20",
-  },
-  rose: {
-    bg: "bg-rose-500/10",
-    text: "text-rose-400",
-    border: "border-rose-500/20",
-    iconBg: "bg-rose-500/20",
-  },
-};
-
-export default function StatCard({ label, value, icon, color, subtitle }: StatCardProps) {
-  const c = colorMap[color];
+export default function StatCard({ label, value, subtitle, accent }: StatCardProps) {
   return (
-    <div className={`${c.bg} border ${c.border} rounded-xl p-5 transition-all duration-200 hover:scale-[1.02]`}>
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-dark-400 text-sm font-medium">{label}</p>
-          <p className={`text-3xl font-bold mt-1 ${c.text}`}>{value}</p>
-          {subtitle && <p className="text-dark-500 text-xs mt-1">{subtitle}</p>}
-        </div>
-        <div className={`${c.iconBg} rounded-lg p-2.5`}>
-          <svg className={`w-5 h-5 ${c.text}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={icon} />
-          </svg>
-        </div>
+    <div
+      style={{
+        background: "#111113",
+        border: accent ? "1px solid rgba(201,169,110,0.3)" : "1px solid #1e1e22",
+        borderRadius: 12,
+        padding: "20px 24px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 6,
+        position: "relative",
+        overflow: "hidden",
+      }}
+    >
+      {accent && (
+        <div style={{
+          position: "absolute",
+          top: 0, left: 0, right: 0,
+          height: 2,
+          background: "linear-gradient(90deg, #c9a96e, #a88854)",
+        }} />
+      )}
+      <div style={{ fontSize: 11, color: "#555", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+        {label}
       </div>
+      <div style={{ fontSize: 32, fontWeight: 700, color: accent ? "#c9a96e" : "#f0f0f0", lineHeight: 1 }}>
+        {value}
+      </div>
+      {subtitle && (
+        <div style={{ fontSize: 12, color: "#555" }}>{subtitle}</div>
+      )}
     </div>
   );
 }

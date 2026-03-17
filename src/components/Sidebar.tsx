@@ -5,9 +5,47 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 
 const navItems = [
-  { href: "/", label: "Dashboard", icon: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" },
-  { href: "/fronta", label: "Fronta", icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" },
-  { href: "/tvorba", label: "Nový příspěvek", icon: "M12 4v16m8-8H4" },
+  {
+    href: "/",
+    label: "Dashboard",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="3" width="7" height="7" rx="1" />
+        <rect x="14" y="3" width="7" height="7" rx="1" />
+        <rect x="3" y="14" width="7" height="7" rx="1" />
+        <rect x="14" y="14" width="7" height="7" rx="1" />
+      </svg>
+    ),
+  },
+  {
+    href: "/fronta",
+    label: "Fronta",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" />
+        <rect x="9" y="3" width="6" height="4" rx="1" />
+        <path d="M9 12h6M9 16h4" />
+      </svg>
+    ),
+  },
+  {
+    href: "/novy",
+    label: "Nový příspěvek",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 8v8M8 12h8" />
+      </svg>
+    ),
+  },
+];
+
+const platforms = [
+  { name: "Facebook", color: "#1877F2", connected: true },
+  { name: "Instagram", color: "#E1306C", connected: true },
+  { name: "LinkedIn", color: "#0A66C2", connected: true },
+  { name: "TikTok", color: "#FF0050", connected: false },
+  { name: "YouTube", color: "#FF0000", connected: false },
 ];
 
 export default function Sidebar() {
@@ -17,86 +55,115 @@ export default function Sidebar() {
   return (
     <>
       {/* Mobile header */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-dark-900 border-b border-dark-700 px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-gradient-to-br from-primary-500 to-accent-500 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-sm">OF</span>
+      <div className="md:hidden fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 py-3" style={{ background: "#111113", borderBottom: "1px solid #1e1e22" }}>
+        <div className="flex items-center gap-2.5">
+          <div style={{ width: 32, height: 32, background: "linear-gradient(135deg, #c9a96e, #a88854)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+            </svg>
           </div>
-          <span className="font-bold text-lg bg-gradient-to-r from-primary-400 to-accent-400 bg-clip-text text-transparent">
-            OneFlow
-          </span>
+          <span className="font-semibold text-base" style={{ color: "#f0f0f0" }}>OneFlow <span style={{ color: "#c9a96e" }}>Social</span></span>
         </div>
-        <button
-          onClick={() => setMobileOpen(!mobileOpen)}
-          className="text-dark-300 hover:text-white p-2"
-        >
-          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={mobileOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"} />
+        <button onClick={() => setMobileOpen(!mobileOpen)} style={{ color: "#888", padding: 8 }}>
+          <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d={mobileOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"} />
           </svg>
         </button>
       </div>
 
-      {/* Mobile overlay */}
       {mobileOpen && (
-        <div className="md:hidden fixed inset-0 z-40 bg-black/50" onClick={() => setMobileOpen(false)} />
+        <div className="md:hidden fixed inset-0 z-40" style={{ background: "rgba(0,0,0,0.6)" }} onClick={() => setMobileOpen(false)} />
       )}
 
-      {/* Sidebar */}
-      <aside className={`fixed top-0 left-0 h-full w-64 bg-dark-900 border-r border-dark-700 z-40 transform transition-transform duration-200 ${mobileOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0`}>
-        <div className="p-6">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-accent-500 rounded-xl flex items-center justify-center">
-              <span className="text-white font-bold text-lg">OF</span>
+      <aside
+        className={`fixed top-0 left-0 h-full z-40 transform transition-transform duration-200 ${mobileOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0`}
+        style={{ width: 256, background: "#111113", borderRight: "1px solid #1e1e22", display: "flex", flexDirection: "column" }}
+      >
+        {/* Logo */}
+        <div style={{ padding: "28px 24px 20px" }}>
+          <div className="flex items-center gap-3">
+            <div style={{ width: 40, height: 40, background: "linear-gradient(135deg, #c9a96e 0%, #a88854 100%)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <path d="M12 3L3 8.5l9 5 9-5L12 3z" fill="white" fillOpacity="0.9" />
+                <path d="M3 15.5l9 5 9-5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M3 12l9 5 9-5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" strokeOpacity="0.6" />
+              </svg>
             </div>
             <div>
-              <h1 className="font-bold text-xl bg-gradient-to-r from-primary-400 to-accent-400 bg-clip-text text-transparent">
+              <div style={{ fontWeight: 700, fontSize: 17, color: "#f0f0f0", letterSpacing: "-0.01em" }}>
                 OneFlow
-              </h1>
-              <p className="text-dark-400 text-xs">Social Dashboard</p>
+              </div>
+              <div style={{ fontSize: 11, color: "#c9a96e", fontWeight: 500, letterSpacing: "0.05em", textTransform: "uppercase" }}>
+                Social Planner
+              </div>
             </div>
           </div>
         </div>
 
-        <nav className="px-3 space-y-1">
-          {navItems.map((item) => {
-            const isActive = pathname === item.href;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setMobileOpen(false)}
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group ${
-                  isActive
-                    ? "bg-primary-600/20 text-primary-400"
-                    : "text-dark-400 hover:text-dark-100 hover:bg-dark-800"
-                }`}
-              >
-                <svg
-                  className={`w-5 h-5 ${isActive ? "text-primary-400" : "text-dark-500 group-hover:text-dark-300"}`}
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
+        {/* Nav */}
+        <nav style={{ padding: "0 12px", flex: 1 }}>
+          <div style={{ fontSize: 10, color: "#555", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8, paddingLeft: 12 }}>
+            Navigace
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            {navItems.map((item) => {
+              const isActive = pathname === item.href;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setMobileOpen(false)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: "10px 14px",
+                    borderRadius: 8,
+                    transition: "all 0.15s",
+                    textDecoration: "none",
+                    background: isActive ? "rgba(201, 169, 110, 0.1)" : "transparent",
+                    color: isActive ? "#c9a96e" : "#888",
+                    borderLeft: isActive ? "2px solid #c9a96e" : "2px solid transparent",
+                  }}
+                  className="sidebar-link"
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} />
-                </svg>
-                <span className="font-medium">{item.label}</span>
-                {isActive && (
-                  <div className="ml-auto w-1.5 h-1.5 rounded-full bg-primary-400" />
-                )}
-              </Link>
-            );
-          })}
+                  <span style={{ color: isActive ? "#c9a96e" : "#555" }}>{item.icon}</span>
+                  <span style={{ fontWeight: isActive ? 600 : 400, fontSize: 14 }}>{item.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+
+          {/* Platforms */}
+          <div style={{ marginTop: 28 }}>
+            <div style={{ fontSize: 10, color: "#555", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10, paddingLeft: 12 }}>
+              Platformy
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+              {platforms.map((p) => (
+                <div key={p.name} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 14px", borderRadius: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: p.color, opacity: p.connected ? 1 : 0.3 }} />
+                    <span style={{ fontSize: 13, color: p.connected ? "#aaa" : "#555" }}>{p.name}</span>
+                  </div>
+                  <span style={{ fontSize: 11, color: p.connected ? "#4ade80" : "#555" }}>
+                    {p.connected ? "✓" : "○"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
         </nav>
 
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-dark-700">
-          <div className="text-dark-500 text-xs text-center">
-            OneFlow Social Manager v1.0
+        {/* Footer */}
+        <div style={{ padding: "16px 24px", borderTop: "1px solid #1e1e22" }}>
+          <div style={{ fontSize: 11, color: "#444", textAlign: "center" }}>
+            OneFlow Social Manager v2.0
           </div>
         </div>
       </aside>
 
-      {/* Mobile spacer */}
-      <div className="md:hidden h-14" />
+      <div className="md:hidden" style={{ height: 56 }} />
     </>
   );
 }
