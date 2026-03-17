@@ -1,8 +1,6 @@
-"use client";
+'use client';
 
-import { useEffect, useState, useCallback } from "react";
-import StatusBadge from "@/components/StatusBadge";
-import { PlatformIcon, getPlatformColor } from "@/components/PlatformIcon";
+import { useState, useEffect, useCallback } from 'react';
 
 interface QueueItem {
   id: string;
@@ -13,352 +11,249 @@ interface QueueItem {
   caption: string;
   mediaFile: string;
   status: string;
+  rowIndex: number;
 }
 
-const PLATFORMS = ["Facebook", "Instagram", "LinkedIn", "TikTok", "YouTube Shorts"];
-const STATUSES = ["pending", "scheduled", "posted", "error"];
-const STATUS_LABELS: Record<string, string> = {
-  pending: "Čeká",
-  scheduled: "Naplánováno",
-  posted: "Zveřejněno",
-  error: "Chyba",
+const PLATFORM_COLORS: Record<string, string> = {
+  Facebook: '#1877f2', FB: '#1877f2',
+  Instagram: '#e1306c', IG: '#e1306c',
+  LinkedIn: '#0077b5', LI: '#0077b5',
+  TikTok: '#69c9d0', TT: '#69c9d0',
+  YouTube: '#ff0000', YT: '#ff0000',
 };
 
-type ViewMode = "list" | "grid";
+function platColor(p: string) { return PLATFORM_COLORS[p] || '#6a7a8a'; }
+function platShort(p: string) {
+  if (!p) return '?';
+  const map: Record<string, string> = { Facebook: 'FB', Instagram: 'IG', LinkedIn: 'LI', TikTok: 'TT', YouTube: 'YT' };
+  return map[p] || (p.length <= 3 ? p.toUpperCase() : p.slice(0,2).toUpperCase());
+}
 
-function PostCard({ item, onDelete, onCycleStatus, deleting }: {
-  item: QueueItem;
-  onDelete: (id: string) => void;
-  onCycleStatus: (item: QueueItem) => void;
-  deleting: string | null;
-}) {
-  return (
-    <div style={{
-      background: "#111113", border: "1px solid #1e1e22", borderRadius: 12, padding: 16,
-      display: "flex", flexDirection: "column", gap: 12, transition: "border-color 0.15s",
-    }}
-      onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#2a2a2e")}
-      onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#1e1e22")}
-    >
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ width: 32, height: 32, borderRadius: 8, background: getPlatformColor(item.platforma) + "18", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <PlatformIcon platform={item.platforma} size={16} />
-          </div>
-          <div>
-            <div style={{ fontSize: 12, color: getPlatformColor(item.platforma), fontWeight: 600 }}>{item.platforma}</div>
-            <div style={{ fontSize: 11, color: "#555" }}>{item.typ}</div>
-          </div>
-        </div>
-        <StatusBadge status={item.status} onClick={() => onCycleStatus(item)} />
-      </div>
-      <p style={{ fontSize: 13, color: "#aaa", margin: 0, lineHeight: 1.5, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", flex: 1 }}>
-        {item.caption || <span style={{ color: "#444", fontStyle: "italic" }}>Bez popisku</span>}
-      </p>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 8, borderTop: "1px solid #1e1e22" }}>
-        <div style={{ fontSize: 11, color: "#555" }}>
-          📅 {item.datum} {item.cas && `· ${item.cas}`}
-        </div>
-        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-          {item.mediaFile && (
-            <a href={item.mediaFile} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: "#c9a96e", textDecoration: "none" }}>Media ↗</a>
-          )}
-          <button
-            onClick={() => onDelete(item.id)}
-            disabled={deleting === item.id}
-            style={{
-              width: 26, height: 26, borderRadius: 6, border: "1px solid transparent",
-              background: "transparent", color: "#555", cursor: "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s",
-            }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(239,68,68,0.1)"; (e.currentTarget as HTMLButtonElement).style.color = "#f87171"; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; (e.currentTarget as HTMLButtonElement).style.color = "#555"; }}
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
-            </svg>
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+function StatusTag({ status }: { status: string }) {
+  const s = (status || '').toLowerCase();
+  const cls = s === 'scheduled' ? 'tag tag-sched' :
+              s === 'posted' ? 'tag tag-posted' :
+              s === 'error' || s === 'err' ? 'tag tag-err' :
+              'tag tag-pend';
+  const label = s === 'scheduled' ? 'SCHED' : s === 'posted' ? 'POSTED' : (s === 'error' || s === 'err') ? 'ERR' : 'PEND';
+  return <span className={cls}>{label}</span>;
 }
 
 export default function FrontaPage() {
   const [items, setItems] = useState<QueueItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filterStatus, setFilterStatus] = useState("all");
-  const [filterPlatform, setFilterPlatform] = useState("all");
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [platFilter, setPlatFilter] = useState<string>('ALL');
   const [deleting, setDeleting] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<ViewMode>("list");
 
   const fetchItems = useCallback(async () => {
     try {
-      const res = await fetch("/api/queue");
-      const data = await res.json();
-      setItems(data.items || []);
-    } catch (err) {
-      console.error("Failed to fetch:", err);
-    } finally {
-      setLoading(false);
-    }
+      const res = await fetch('/api/queue');
+      if (res.ok) { const data = await res.json(); setItems(data.items || []); }
+    } catch {}
+    finally { setLoading(false); }
   }, []);
 
   useEffect(() => { fetchItems(); }, [fetchItems]);
 
-  const cycleStatus = async (item: QueueItem) => {
-    const order = ["pending", "scheduled", "posted"];
-    const currentIdx = order.indexOf(item.status);
-    const nextStatus = order[(currentIdx + 1) % order.length];
+  const updateStatus = async (item: QueueItem, newStatus: string) => {
     try {
-      await fetch(`/api/queue/${item.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: nextStatus }),
+      await fetch(`/api/queue?id=${item.id}&rowIndex=${item.rowIndex}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
       });
-      await fetchItems();
-    } catch (err) {
-      console.error("Failed to update status:", err);
-    }
+      fetchItems();
+    } catch {}
   };
 
-  const deleteItem = async (id: string) => {
-    if (!confirm("Opravdu smazat tento příspěvek?")) return;
-    setDeleting(id);
+  const deleteItem = async (item: QueueItem) => {
+    if (!confirm(`Smazat #${item.id}?`)) return;
+    setDeleting(item.id);
     try {
-      await fetch(`/api/queue/${id}`, { method: "DELETE" });
-      await fetchItems();
-    } catch (err) {
-      console.error("Failed to delete:", err);
-    } finally {
-      setDeleting(null);
-    }
+      await fetch(`/api/queue?id=${item.id}&rowIndex=${item.rowIndex}`, { method: 'DELETE' });
+      fetchItems();
+    } catch {}
+    finally { setDeleting(null); }
   };
 
-  const deleteSelected = async () => {
-    if (!confirm(`Smazat ${selectedIds.size} příspěvků?`)) return;
-    for (const id of Array.from(selectedIds)) {
-      await fetch(`/api/queue/${id}`, { method: "DELETE" });
-    }
-    setSelectedIds(new Set());
-    await fetchItems();
-  };
+  const statusFilters = ['ALL', 'PEND', 'SCHED', 'POSTED', 'ERR'];
+  const platFilters = ['ALL', 'FB', 'IG', 'LI', 'TT', 'YT'];
 
-  const toggleSelect = (id: string) => {
-    const next = new Set(selectedIds);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    setSelectedIds(next);
-  };
-
-  const filteredItems = items.filter((i) => {
-    if (filterStatus !== "all" && i.status !== filterStatus) return false;
-    if (filterPlatform !== "all" && i.platforma !== filterPlatform) return false;
-    return true;
+  const filtered = items.filter(item => {
+    const s = (item.status || '').toLowerCase();
+    const statusOk = statusFilter === 'ALL' ||
+      (statusFilter === 'PEND' && s === 'pending') ||
+      (statusFilter === 'SCHED' && s === 'scheduled') ||
+      (statusFilter === 'POSTED' && s === 'posted') ||
+      (statusFilter === 'ERR' && (s === 'error' || s === 'err'));
+    const pl = (item.platforma || '').toLowerCase();
+    const platOk = platFilter === 'ALL' || pl.includes(platFilter.toLowerCase()) ||
+      (platFilter === 'FB' && pl.includes('facebook')) ||
+      (platFilter === 'IG' && pl.includes('instagram')) ||
+      (platFilter === 'LI' && pl.includes('linkedin')) ||
+      (platFilter === 'TT' && pl.includes('tiktok')) ||
+      (platFilter === 'YT' && pl.includes('youtube'));
+    return statusOk && platOk;
   });
 
-  if (loading) {
-    return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
-        <div style={{ textAlign: "center" }}>
-          <div style={{ width: 36, height: 36, border: "2px solid #c9a96e", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 14px" }} />
-          <p style={{ color: "#555", fontSize: 14 }}>Načítám frontu...</p>
-          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24, paddingTop: 8 }}>
+    <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', background: 'var(--bg-panel)' }}>
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-        <div>
-          <h1 style={{ fontSize: 24, fontWeight: 700, color: "#f0f0f0", marginBottom: 4 }}>Fronta příspěvků</h1>
-          <p style={{ color: "#555", fontSize: 14 }}>{items.length} příspěvků celkem · {filteredItems.length} zobrazeno</p>
-        </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {selectedIds.size > 0 && (
-            <button onClick={deleteSelected} style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", color: "#f87171", padding: "8px 16px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontWeight: 500 }}>
-              Smazat ({selectedIds.size})
-            </button>
-          )}
-          {/* View toggle */}
-          <div style={{ display: "flex", background: "#111113", border: "1px solid #1e1e22", borderRadius: 8, padding: 3, gap: 2 }}>
-            <button
-              onClick={() => setViewMode("list")}
-              style={{
-                padding: "6px 10px", borderRadius: 6, border: "none", cursor: "pointer",
-                background: viewMode === "list" ? "#1e1e22" : "transparent",
-                color: viewMode === "list" ? "#f0f0f0" : "#555",
-              }}
-              title="Listový pohled"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
-            </button>
-            <button
-              onClick={() => setViewMode("grid")}
-              style={{
-                padding: "6px 10px", borderRadius: 6, border: "none", cursor: "pointer",
-                background: viewMode === "grid" ? "#1e1e22" : "transparent",
-                color: viewMode === "grid" ? "#f0f0f0" : "#555",
-              }}
-              title="Mřížkový pohled"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-            </button>
-          </div>
-        </div>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        padding: '0 12px',
+        height: 36,
+        background: 'var(--bg-header)',
+        borderBottom: '1px solid var(--border-primary)',
+        gap: 8,
+        flexShrink: 0,
+      }}>
+        <div style={{ width: 3, height: 14, background: 'var(--accent-gold)', borderRadius: 1 }} />
+        <span style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 2, color: 'var(--text-secondary)' }}>
+          Fronta příspěvků
+        </span>
+        <span style={{ fontSize: 9, color: 'var(--text-muted)', background: 'rgba(255,255,255,0.04)', padding: '1px 6px', borderRadius: 2 }}>
+          {filtered.length}/{items.length}
+        </span>
+
+        <span className="sep" style={{ marginLeft: 8 }}>|</span>
+
+        {/* Status filter */}
+        {statusFilters.map(f => (
+          <button key={f} className={`btn-terminal sm ${statusFilter === f ? 'active' : ''}`} onClick={() => setStatusFilter(f)}>
+            {f}
+          </button>
+        ))}
+
+        <span className="sep">|</span>
+
+        {/* Platform filter */}
+        {platFilters.map(f => (
+          <button
+            key={f}
+            className={`btn-terminal sm ${platFilter === f ? 'active' : ''}`}
+            onClick={() => setPlatFilter(f)}
+            style={platFilter === f && f !== 'ALL' ? { borderColor: platColor(f), color: platColor(f) } : {}}
+          >
+            {f}
+          </button>
+        ))}
+
+        <div style={{ flex: 1 }} />
+        <button className="btn-terminal sm" onClick={fetchItems}>↻ OBNOVIT</button>
       </div>
 
-      {/* Filters */}
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-        <div style={{ display: "flex", gap: 4, background: "#111113", border: "1px solid #1e1e22", borderRadius: 8, padding: 4 }}>
-          <button onClick={() => setFilterStatus("all")} style={{ padding: "6px 14px", borderRadius: 6, fontSize: 13, cursor: "pointer", fontWeight: 500, background: filterStatus === "all" ? "#c9a96e" : "transparent", color: filterStatus === "all" ? "#0a0a0b" : "#888", border: "none" }}>
-            Vše
-          </button>
-          {STATUSES.map((s) => (
-            <button key={s} onClick={() => setFilterStatus(s)} style={{ padding: "6px 14px", borderRadius: 6, fontSize: 13, cursor: "pointer", fontWeight: 500, background: filterStatus === s ? "#c9a96e" : "transparent", color: filterStatus === s ? "#0a0a0b" : "#888", border: "none" }}>
-              {STATUS_LABELS[s]}
-            </button>
-          ))}
-        </div>
-        <div style={{ display: "flex", gap: 4, background: "#111113", border: "1px solid #1e1e22", borderRadius: 8, padding: 4 }}>
-          <button onClick={() => setFilterPlatform("all")} style={{ padding: "6px 14px", borderRadius: 6, fontSize: 13, cursor: "pointer", fontWeight: 500, background: filterPlatform === "all" ? "#1e1e22" : "transparent", color: filterPlatform === "all" ? "#f0f0f0" : "#888", border: "none" }}>
-            Všechny
-          </button>
-          {PLATFORMS.map((p) => (
-            <button key={p} onClick={() => setFilterPlatform(p)} style={{ padding: "6px 14px", borderRadius: 6, fontSize: 13, cursor: "pointer", fontWeight: 500, background: filterPlatform === p ? "#1e1e22" : "transparent", color: filterPlatform === p ? getPlatformColor(p) : "#888", border: "none" }}>
-              {p}
-            </button>
-          ))}
-        </div>
+      {/* Column headers */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '36px 70px 90px 55px 60px 1fr 120px 70px 100px',
+        gap: 0,
+        padding: '4px 12px',
+        background: 'var(--bg-header)',
+        borderBottom: '1px solid var(--border-primary)',
+        flexShrink: 0,
+      }}>
+        {['#', 'PLATFORMA', 'DATUM', 'ČAS', 'TYP', 'CAPTION', 'MEDIA', 'STATUS', 'AKCE'].map(col => (
+          <div key={col} style={{ fontSize: 8, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1.5, padding: '0 4px' }}>
+            {col}
+          </div>
+        ))}
       </div>
 
-      {/* Grid view */}
-      {viewMode === "grid" && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }} className="grid-view">
-          {filteredItems.map((item) => (
-            <PostCard key={item.id} item={item} onDelete={deleteItem} onCycleStatus={cycleStatus} deleting={deleting} />
-          ))}
-          {filteredItems.length === 0 && (
-            <div style={{ gridColumn: "1/-1", textAlign: "center", padding: "60px 20px", color: "#444", fontSize: 14 }}>
-              Žádné příspěvky k zobrazení
-            </div>
-          )}
-        </div>
-      )}
+      {/* Table */}
+      <div style={{ flex: 1, overflowY: 'auto' }}>
+        {loading && (
+          <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 11, letterSpacing: 2 }}>
+            NAČÍTÁM_
+          </div>
+        )}
+        {!loading && filtered.length === 0 && (
+          <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 10 }}>
+            — žádné příspěvky odpovídají filtru —
+          </div>
+        )}
+        {filtered.map((item, idx) => (
+          <div
+            key={item.id}
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '36px 70px 90px 55px 60px 1fr 120px 70px 100px',
+              gap: 0,
+              padding: '5px 12px',
+              borderBottom: '1px solid rgba(19,30,42,0.5)',
+              background: idx % 2 === 1 ? 'rgba(255,255,255,0.006)' : 'transparent',
+              alignItems: 'center',
+              transition: 'background 0.1s ease',
+              opacity: deleting === item.id ? 0.4 : 1,
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(201,169,110,0.04)')}
+            onMouseLeave={e => (e.currentTarget.style.background = idx % 2 === 1 ? 'rgba(255,255,255,0.006)' : 'transparent')}
+          >
+            {/* # */}
+            <div style={{ fontSize: 9, color: 'var(--text-muted)', padding: '0 4px' }}>#{idx + 1}</div>
 
-      {/* List view (table) */}
-      {viewMode === "list" && (
-        <>
-          <div style={{ background: "#111113", border: "1px solid #1e1e22", borderRadius: 12, overflow: "hidden" }} className="queue-table-wrap">
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead>
-                  <tr style={{ borderBottom: "1px solid #1e1e22" }}>
-                    <th style={thStyle}>
-                      <input type="checkbox" style={{ accentColor: "#c9a96e" }}
-                        checked={filteredItems.length > 0 && filteredItems.every((i) => selectedIds.has(i.id))}
-                        onChange={(e) => {
-                          if (e.target.checked) setSelectedIds(new Set(filteredItems.map((i) => i.id)));
-                          else setSelectedIds(new Set());
-                        }}
-                      />
-                    </th>
-                    <th style={thStyle}>Platforma</th>
-                    <th style={thStyle}>Datum & Čas</th>
-                    <th style={thStyle}>Caption</th>
-                    <th style={thStyle}>Typ</th>
-                    <th style={thStyle}>Media</th>
-                    <th style={thStyle}>Status</th>
-                    <th style={{ ...thStyle, textAlign: "right" }}>Akce</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredItems.map((item) => (
-                    <tr
-                      key={item.id}
-                      style={{ borderBottom: "1px solid #16161a", transition: "background 0.15s", background: selectedIds.has(item.id) ? "rgba(201,169,110,0.04)" : "transparent" }}
-                      onMouseEnter={(e) => { if (!selectedIds.has(item.id)) (e.currentTarget as HTMLTableRowElement).style.background = "#16161a"; }}
-                      onMouseLeave={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = selectedIds.has(item.id) ? "rgba(201,169,110,0.04)" : "transparent"; }}
-                    >
-                      <td style={tdStyle}>
-                        <input type="checkbox" style={{ accentColor: "#c9a96e" }} checked={selectedIds.has(item.id)} onChange={() => toggleSelect(item.id)} />
-                      </td>
-                      <td style={tdStyle}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <PlatformIcon platform={item.platforma} size={18} />
-                          <span style={{ fontSize: 13, color: getPlatformColor(item.platforma), fontWeight: 500 }}>{item.platforma}</span>
-                        </div>
-                      </td>
-                      <td style={tdStyle}>
-                        <div style={{ fontSize: 13, color: "#f0f0f0", fontWeight: 500 }}>{item.datum}</div>
-                        <div style={{ fontSize: 12, color: "#555" }}>{item.cas}</div>
-                      </td>
-                      <td style={{ ...tdStyle, maxWidth: 280 }}>
-                        <p style={{ fontSize: 13, color: "#aaa", margin: 0, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-                          {item.caption || <span style={{ color: "#444", fontStyle: "italic" }}>Bez popisku</span>}
-                        </p>
-                      </td>
-                      <td style={tdStyle}><span style={{ fontSize: 12, color: "#555" }}>{item.typ || "—"}</span></td>
-                      <td style={tdStyle}>
-                        {item.mediaFile ? (
-                          <a href={item.mediaFile} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: "#c9a96e", textDecoration: "none" }}>Link</a>
-                        ) : <span style={{ fontSize: 12, color: "#444" }}>—</span>}
-                      </td>
-                      <td style={tdStyle}><StatusBadge status={item.status} onClick={() => cycleStatus(item)} /></td>
-                      <td style={{ ...tdStyle, textAlign: "right" }}>
-                        <button
-                          onClick={() => deleteItem(item.id)}
-                          disabled={deleting === item.id}
-                          style={{ width: 30, height: 30, borderRadius: 6, border: "1px solid transparent", background: "transparent", color: "#555", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}
-                          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(239,68,68,0.1)"; (e.currentTarget as HTMLButtonElement).style.color = "#f87171"; }}
-                          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; (e.currentTarget as HTMLButtonElement).style.color = "#555"; }}
-                        >
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {filteredItems.length === 0 && (
-                <div style={{ textAlign: "center", padding: "60px 20px", color: "#444", fontSize: 14 }}>Žádné příspěvky k zobrazení</div>
-              )}
+            {/* Platform */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '0 4px' }}>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: platColor(item.platforma), flexShrink: 0 }} />
+              <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>{platShort(item.platforma)}</span>
+            </div>
+
+            {/* Datum */}
+            <div style={{ fontSize: 10, color: 'var(--text-secondary)', padding: '0 4px', fontVariantNumeric: 'tabular-nums' }}>
+              {item.datum || '—'}
+            </div>
+
+            {/* Čas */}
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', padding: '0 4px', fontVariantNumeric: 'tabular-nums' }}>
+              {item.cas || '—'}
+            </div>
+
+            {/* Typ */}
+            <div style={{ fontSize: 9, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, padding: '0 4px' }}>
+              {item.typ || 'post'}
+            </div>
+
+            {/* Caption */}
+            <div style={{ fontSize: 11, color: 'var(--text-primary)', padding: '0 4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {item.caption || '—'}
+            </div>
+
+            {/* Media */}
+            <div style={{ fontSize: 9, color: 'var(--text-muted)', padding: '0 4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {item.mediaFile || '—'}
+            </div>
+
+            {/* Status */}
+            <div style={{ padding: '0 4px' }}>
+              <StatusTag status={item.status} />
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: 3, padding: '0 4px' }}>
+              <button
+                className="btn-terminal sm"
+                title="Změnit status"
+                onClick={() => {
+                  const s = (item.status || '').toLowerCase();
+                  const next = s === 'pending' ? 'scheduled' : s === 'scheduled' ? 'posted' : 'pending';
+                  updateStatus(item, next);
+                }}
+              >
+                ↺
+              </button>
+              <button
+                className="btn-terminal sm danger"
+                title="Smazat"
+                onClick={() => deleteItem(item)}
+              >
+                ✕
+              </button>
             </div>
           </div>
-
-          {/* Mobile cards */}
-          <div className="queue-mobile">
-            {filteredItems.map((item) => (
-              <PostCard key={item.id} item={item} onDelete={deleteItem} onCycleStatus={cycleStatus} deleting={deleting} />
-            ))}
-          </div>
-        </>
-      )}
-
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .queue-mobile { display: none; }
-        @media (max-width: 768px) {
-          .queue-table-wrap { display: none !important; }
-          .queue-mobile { display: flex; flex-direction: column; gap: 8px; }
-          .grid-view { grid-template-columns: 1fr !important; }
-        }
-        @media (max-width: 1024px) {
-          .grid-view { grid-template-columns: repeat(2, 1fr) !important; }
-        }
-      `}</style>
+        ))}
+      </div>
     </div>
   );
 }
-
-const thStyle: React.CSSProperties = {
-  padding: "12px 16px", textAlign: "left", fontSize: 11, fontWeight: 600,
-  color: "#555", letterSpacing: "0.06em", textTransform: "uppercase", whiteSpace: "nowrap",
-};
-
-const tdStyle: React.CSSProperties = {
-  padding: "12px 16px", verticalAlign: "middle",
-};

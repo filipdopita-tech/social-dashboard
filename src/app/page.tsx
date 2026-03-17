@@ -1,19 +1,6 @@
-"use client";
+'use client';
 
-import { useEffect, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import StatCard from "@/components/StatCard";
-import { PlatformIcon, getPlatformColor } from "@/components/PlatformIcon";
-import StatusBadge from "@/components/StatusBadge";
-
-interface Stats {
-  total: number;
-  pending: number;
-  scheduled: number;
-  posted: number;
-  todayPosts: number;
-  weekPosts: number;
-}
+import { useState, useEffect, useCallback } from 'react';
 
 interface QueueItem {
   id: string;
@@ -24,285 +11,583 @@ interface QueueItem {
   caption: string;
   mediaFile: string;
   status: string;
+  rowIndex: number;
 }
 
-const PLATFORM_GROUPS = [
-  { name: "Facebook", color: "#1877F2", connected: true },
-  { name: "Instagram", color: "#E1306C", connected: true },
-  { name: "LinkedIn", color: "#0A66C2", connected: true },
-  { name: "TikTok", color: "#FF0050", connected: false },
-  { name: "YouTube Shorts", color: "#FF0000", connected: true },
-];
+const PLATFORM_COLORS: Record<string, string> = {
+  Facebook: '#1877f2',
+  Instagram: '#e1306c',
+  LinkedIn: '#0077b5',
+  TikTok: '#69c9d0',
+  YouTube: '#ff0000',
+  FB: '#1877f2', IG: '#e1306c', LI: '#0077b5', TT: '#69c9d0', YT: '#ff0000',
+};
 
-const DAYS_CZ = ["Ne", "Po", "Út", "St", "Čt", "Pá", "So"];
-const DAYS_CZ_FULL = ["Neděle", "Pondělí", "Úterý", "Středa", "Čtvrtek", "Pátek", "Sobota"];
-
-function getWeekDays() {
-  const today = new Date();
-  const dayOfWeek = today.getDay(); // 0=Sun
-  // Start from Monday
-  const monday = new Date(today);
-  monday.setDate(today.getDate() - ((dayOfWeek + 6) % 7));
-  const days = [];
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(monday);
-    d.setDate(monday.getDate() + i);
-    days.push(d);
-  }
-  return days;
+function platColor(p: string) {
+  return PLATFORM_COLORS[p] || '#6a7a8a';
 }
 
-function formatDateKey(d: Date) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+function platShort(p: string) {
+  if (!p) return '?';
+  if (p.length <= 3) return p.toUpperCase();
+  return p.slice(0, 2).toUpperCase();
 }
 
-export default function DashboardPage() {
-  const router = useRouter();
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [items, setItems] = useState<QueueItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+function StatusTag({ status }: { status: string }) {
+  const s = (status || '').toLowerCase();
+  const cls = s === 'scheduled' ? 'tag tag-sched' :
+              s === 'posted' ? 'tag tag-posted' :
+              s === 'error' || s === 'err' ? 'tag tag-err' :
+              'tag tag-pend';
+  const label = s === 'scheduled' ? 'SCHED' :
+                s === 'posted' ? 'POSTED' :
+                s === 'error' || s === 'err' ? 'ERR' :
+                'PEND';
+  return <span className={cls}>{label}</span>;
+}
 
-  const fetchData = useCallback(async () => {
-    try {
-      const [statsRes, queueRes] = await Promise.all([
-        fetch("/api/stats"),
-        fetch("/api/queue"),
-      ]);
-      const statsData = await statsRes.json();
-      const queueData = await queueRes.json();
-      setStats(statsData);
-      setItems(queueData.items || []);
-    } catch (err) {
-      console.error("Failed to fetch data:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  const weekDays = getWeekDays();
-  const todayKey = formatDateKey(new Date());
-
-  const getItemsForDay = (d: Date) => {
-    const key = formatDateKey(d);
-    return items.filter((i) => i.datum === key).sort((a, b) => a.cas.localeCompare(b.cas));
-  };
-
-  const upcomingItems = items
-    .filter((i) => i.status !== "posted")
-    .sort((a, b) => `${a.datum} ${a.cas}`.localeCompare(`${b.datum} ${b.cas}`))
-    .slice(0, 5);
-
-  if (loading) {
-    return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
-        <div style={{ textAlign: "center" }}>
-          <div style={{ width: 40, height: 40, border: "2px solid #c9a96e", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 16px" }} />
-          <p style={{ color: "#555", fontSize: 14 }}>Načítám data...</p>
-          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-        </div>
-      </div>
-    );
-  }
-
-  const platformStats = PLATFORM_GROUPS.map((p) => ({
-    ...p,
-    count: items.filter((i) => i.platforma === p.name).length,
-  }));
-
-  const selectedDayItems = selectedDay ? items.filter((i) => i.datum === selectedDay).sort((a, b) => a.cas.localeCompare(b.cas)) : [];
+// ── PANEL 1: FRONTA ──────────────────────────────────────────────
+function FrameQueue({ items }: { items: QueueItem[] }) {
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const upcoming = items.filter(i => i.status !== 'posted').slice(0, 40);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24, paddingTop: 8 }}>
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-        <div>
-          <h1 style={{ fontSize: 24, fontWeight: 700, color: "#f0f0f0", marginBottom: 4 }}>Dashboard</h1>
-          <p style={{ color: "#555", fontSize: 14 }}>Přehled sociálních sítí OneFlow</p>
-        </div>
-        <button
-          onClick={() => router.push("/novy")}
-          className="btn-gold"
-          style={{ display: "flex", alignItems: "center", gap: 8 }}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14"/></svg>
-          Nový příspěvek
-        </button>
+    <div className="panel" style={{ gridColumn: 1, gridRow: '1 / 4' }}>
+      <div className="panel-header">
+        <div className="panel-accent" style={{ background: 'var(--accent-gold)' }} />
+        <span className="panel-title">▶ Fronta</span>
+        <span className="panel-count">{upcoming.length}</span>
       </div>
-
-      {/* Stat cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }} className="stats-grid">
-        <StatCard label="Celkem" value={stats?.total ?? 0} accent />
-        <StatCard label="Naplánováno" value={stats?.scheduled ?? 0} subtitle="Připraveno" />
-        <StatCard label="Zveřejněno" value={stats?.posted ?? 0} subtitle="Hotovo" />
-        <StatCard label="Dnes" value={stats?.todayPosts ?? 0} subtitle="Dnešní příspěvky" />
-      </div>
-
-      {/* Weekly timeline */}
-      <div style={{ background: "#111113", border: "1px solid #1e1e22", borderRadius: 12, padding: 20 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-          <h2 style={{ fontSize: 15, fontWeight: 600, color: "#f0f0f0" }}>Plán na tento týden</h2>
-          <span style={{ fontSize: 12, color: "#555" }}>
-            {weekDays[0].toLocaleDateString("cs-CZ", { day: "numeric", month: "short" })} – {weekDays[6].toLocaleDateString("cs-CZ", { day: "numeric", month: "short" })}
-          </span>
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 8 }} className="week-grid">
-          {weekDays.map((day, idx) => {
-            const key = formatDateKey(day);
-            const isToday = key === todayKey;
-            const dayItems = getItemsForDay(day);
-            const isSelected = selectedDay === key;
-            return (
-              <div
-                key={key}
-                onClick={() => setSelectedDay(isSelected ? null : key)}
-                style={{
-                  background: isToday ? "rgba(201,169,110,0.06)" : isSelected ? "rgba(255,255,255,0.03)" : "#0a0a0b",
-                  border: isToday ? "1px solid rgba(201,169,110,0.3)" : isSelected ? "1px solid #2a2a2e" : "1px solid #1e1e22",
-                  borderRadius: 10, padding: "10px 8px", cursor: "pointer",
-                  transition: "all 0.15s", minHeight: 100,
-                }}
-              >
-                <div style={{ textAlign: "center", marginBottom: 8 }}>
-                  <div style={{ fontSize: 11, color: isToday ? "#c9a96e" : "#555", fontWeight: 600, textTransform: "uppercase" }}>
-                    {DAYS_CZ[(idx + 1) % 7]}
-                  </div>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: isToday ? "#c9a96e" : "#f0f0f0" }}>
-                    {day.getDate()}
-                  </div>
+      <div className="panel-content">
+        {upcoming.length === 0 && (
+          <div style={{ padding: '16px 10px', color: 'var(--text-muted)', fontSize: 10 }}>
+            — žádné čekající příspěvky —
+          </div>
+        )}
+        {upcoming.map(item => (
+          <div key={item.id}>
+            <div
+              className="queue-row"
+              style={{ borderLeftColor: platColor(item.platforma) }}
+              onClick={() => setExpanded(expanded === item.id ? null : item.id)}
+            >
+              <div className="platform-dot" style={{ background: platColor(item.platforma) }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 9, color: 'var(--text-muted)', marginBottom: 1 }}>
+                  {item.datum} {item.cas && `· ${item.cas}`}
                 </div>
-                {dayItems.length === 0 ? (
-                  <div style={{ textAlign: "center" }}>
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); router.push(`/novy?datum=${key}`); }}
-                      style={{ width: 24, height: 24, borderRadius: "50%", border: "1px dashed #2a2a2e", background: "transparent", color: "#444", fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto" }}
-                    >+</button>
-                  </div>
-                ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    {dayItems.slice(0, 3).map((item) => (
-                      <div
-                        key={item.id}
-                        style={{
-                          background: getPlatformColor(item.platforma) + "22",
-                          borderLeft: `2px solid ${getPlatformColor(item.platforma)}`,
-                          borderRadius: 4, padding: "3px 5px",
-                        }}
-                      >
-                        <div style={{ fontSize: 10, color: getPlatformColor(item.platforma), fontWeight: 600 }}>{item.platforma.slice(0, 2).toUpperCase()}</div>
-                        <div style={{ fontSize: 9, color: "#666" }}>{item.cas}</div>
-                      </div>
-                    ))}
-                    {dayItems.length > 3 && (
-                      <div style={{ fontSize: 10, color: "#555", textAlign: "center" }}>+{dayItems.length - 3}</div>
-                    )}
+                <div style={{ fontSize: 11, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {item.caption || '— bez textu —'}
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>{platShort(item.platforma)}</span>
+                <StatusTag status={item.status} />
+              </div>
+            </div>
+            {expanded === item.id && (
+              <div style={{ padding: '8px 10px 8px 21px', background: 'rgba(201,169,110,0.03)', borderBottom: '1px solid var(--border-primary)', animation: 'fadeIn 0.2s ease' }}>
+                <div style={{ fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                  {item.caption}
+                </div>
+                {item.mediaFile && (
+                  <div style={{ marginTop: 4, fontSize: 9, color: 'var(--text-muted)' }}>
+                    🖼 {item.mediaFile}
                   </div>
                 )}
+                <div style={{ marginTop: 4, fontSize: 9, color: 'var(--text-muted)' }}>
+                  Typ: {item.typ} | ID: #{item.id}
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── PANEL 2: KALENDÁŘ ────────────────────────────────────────────
+function FrameCalendar({ items }: { items: QueueItem[] }) {
+  const today = new Date();
+  // Get Mon–Sun of current week
+  const dayOfWeek = today.getDay(); // 0=Sun
+  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const monday = new Date(today);
+  monday.setDate(today.getDate() + mondayOffset);
+
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    return d;
+  });
+
+  const dayNames = ['PO', 'ÚT', 'ST', 'ČT', 'PÁ', 'SO', 'NE'];
+  const todayStr = today.toISOString().split('T')[0];
+
+  function isoDate(d: Date) {
+    return d.toISOString().split('T')[0];
+  }
+
+  function itemsForDay(d: Date) {
+    const ds = isoDate(d);
+    return items.filter(i => i.datum === ds);
+  }
+
+  return (
+    <div className="panel" style={{ gridColumn: 2, gridRow: '1 / 4' }}>
+      <div className="panel-header">
+        <div className="panel-accent" style={{ background: 'var(--accent-blue)' }} />
+        <span className="panel-title">▶ Kalendář</span>
+        <span className="panel-count" style={{ marginLeft: 'auto', fontSize: 9, color: 'var(--text-muted)' }}>
+          tento týden
+        </span>
+      </div>
+      <div className="panel-content">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', height: '100%', gap: 0 }}>
+          {days.map((d, i) => {
+            const ds = isoDate(d);
+            const isToday = ds === todayStr;
+            const dayItems = itemsForDay(d);
+            return (
+              <div
+                key={ds}
+                style={{
+                  borderRight: i < 6 ? '1px solid var(--border-primary)' : 'none',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  overflow: 'hidden',
+                  background: isToday ? 'rgba(201,169,110,0.04)' : 'transparent',
+                  borderTop: isToday ? '2px solid var(--accent-gold)' : '2px solid transparent',
+                }}
+              >
+                {/* Day header */}
+                <div style={{
+                  padding: '5px 4px',
+                  borderBottom: '1px solid var(--border-primary)',
+                  textAlign: 'center',
+                  background: 'var(--bg-header)',
+                  flexShrink: 0,
+                }}>
+                  <div style={{ fontSize: 9, color: isToday ? 'var(--accent-gold)' : 'var(--text-muted)', letterSpacing: 1, fontWeight: 600 }}>
+                    {dayNames[i]}
+                  </div>
+                  <div style={{ fontSize: 12, color: isToday ? 'var(--accent-gold)' : 'var(--text-secondary)', fontWeight: isToday ? 700 : 400 }}>
+                    {d.getDate()}
+                  </div>
+                </div>
+                {/* Posts */}
+                <div style={{ flex: 1, overflowY: 'auto', padding: '2px' }}>
+                  {dayItems.map(item => (
+                    <div
+                      key={item.id}
+                      style={{
+                        padding: '2px 3px',
+                        marginBottom: 2,
+                        borderLeft: `2px solid ${platColor(item.platforma)}`,
+                        background: 'rgba(255,255,255,0.03)',
+                        fontSize: 9,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        cursor: 'default',
+                      }}
+                    >
+                      <span style={{ color: 'var(--text-muted)' }}>{item.cas || '--:--'}</span>
+                      {' '}
+                      <span style={{ color: 'var(--text-secondary)' }}>{item.caption?.slice(0, 20) || '…'}</span>
+                    </div>
+                  ))}
+                  {dayItems.length === 0 && (
+                    <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 9, marginTop: 8, opacity: 0.5 }}>—</div>
+                  )}
+                </div>
               </div>
             );
           })}
         </div>
+      </div>
+    </div>
+  );
+}
 
-        {/* Day detail panel */}
-        {selectedDay && selectedDayItems.length > 0 && (
-          <div style={{ marginTop: 16, background: "#0a0a0b", border: "1px solid #1e1e22", borderRadius: 10, padding: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "#f0f0f0", marginBottom: 12 }}>
-              {new Date(selectedDay + "T12:00:00").toLocaleDateString("cs-CZ", { weekday: "long", day: "numeric", month: "long" })}
-              <span style={{ fontSize: 12, color: "#555", marginLeft: 8 }}>({selectedDayItems.length} příspěvků)</span>
+// ── PANEL 3: PLATFORMY ───────────────────────────────────────────
+function FramePlatforms({ items }: { items: QueueItem[] }) {
+  const platforms = [
+    { id: 'Facebook', short: 'FB', color: '#1877f2', connected: true },
+    { id: 'Instagram', short: 'IG', color: '#e1306c', connected: true },
+    { id: 'LinkedIn', short: 'LI', color: '#0077b5', connected: true },
+    { id: 'TikTok', short: 'TT', color: '#69c9d0', connected: false },
+    { id: 'YouTube', short: 'YT', color: '#ff0000', connected: true },
+  ];
+
+  function countFor(name: string, status?: string) {
+    return items.filter(i => {
+      const match = i.platforma?.toLowerCase().includes(name.toLowerCase()) ||
+                    i.platforma?.toLowerCase().includes(name.slice(0,2).toLowerCase());
+      if (status) return match && i.status === status;
+      return match;
+    }).length;
+  }
+
+  return (
+    <div className="panel" style={{ gridColumn: 3, gridRow: '1 / 4' }}>
+      <div className="panel-header">
+        <div className="panel-accent" style={{ background: 'var(--accent-green)' }} />
+        <span className="panel-title">▶ Platformy</span>
+      </div>
+      <div className="panel-content">
+        {platforms.map(p => {
+          const total = countFor(p.short) + countFor(p.id);
+          const sched = countFor(p.short, 'scheduled') + countFor(p.id, 'scheduled');
+          const posted = countFor(p.short, 'posted') + countFor(p.id, 'posted');
+          const pct = total > 0 ? Math.min(100, Math.round((posted / (total || 1)) * 100)) : 0;
+          return (
+            <div key={p.id} style={{ padding: '8px 10px', borderBottom: '1px solid var(--border-primary)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: p.connected ? p.color : 'var(--text-muted)', boxShadow: p.connected ? `0 0 6px ${p.color}66` : 'none', flexShrink: 0 }} />
+                <span style={{ fontSize: 11, color: 'var(--text-primary)', fontWeight: 600, flex: 1 }}>{p.id}</span>
+                <span className={`tag ${p.connected ? 'tag-posted' : 'tag-pend'}`}>
+                  {p.connected ? 'CONNECTED' : 'PENDING'}
+                </span>
+              </div>
+              <div style={{ display: 'flex', gap: 12, fontSize: 9, color: 'var(--text-muted)', marginBottom: 5 }}>
+                <span>CELKEM: <span style={{ color: 'var(--text-secondary)' }}>{total}</span></span>
+                <span>SCHED: <span style={{ color: 'var(--accent-amber)' }}>{sched}</span></span>
+                <span>POSTED: <span style={{ color: 'var(--accent-green)' }}>{posted}</span></span>
+              </div>
+              {/* Mini bar */}
+              <div style={{ height: 3, background: 'rgba(255,255,255,0.05)', borderRadius: 1, overflow: 'hidden' }}>
+                <div style={{
+                  height: '100%',
+                  width: `${pct}%`,
+                  background: p.connected ? p.color : 'var(--text-muted)',
+                  borderRadius: 1,
+                  transition: 'width 0.6s ease',
+                }} />
+              </div>
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {selectedDayItems.map((item) => (
-                <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", background: "#111113", borderRadius: 8 }}>
-                  <PlatformIcon platform={item.platforma} size={16} />
-                  <span style={{ fontSize: 12, color: getPlatformColor(item.platforma), fontWeight: 600, minWidth: 80 }}>{item.platforma}</span>
-                  <span style={{ fontSize: 12, color: "#555", minWidth: 40 }}>{item.cas}</span>
-                  <p style={{ fontSize: 12, color: "#aaa", flex: 1, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.caption || "Bez popisku"}</p>
-                  <StatusBadge status={item.status} />
-                </div>
-              ))}
-            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── PANEL 4: RYCHLÝ POST ─────────────────────────────────────────
+function FrameQuickPost({ onAdded }: { onAdded: () => void }) {
+  const [platforms, setPlatforms] = useState<string[]>([]);
+  const [caption, setCaption] = useState('');
+  const [datum, setDatum] = useState('');
+  const [cas, setCas] = useState('');
+  const [typ, setTyp] = useState('post');
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  const togglePlat = (p: string) => {
+    setPlatforms(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p]);
+  };
+
+  const submit = async () => {
+    if (!caption || platforms.length === 0) { setMsg('! Vyplň caption a vyber platformu'); return; }
+    setLoading(true); setMsg('');
+    try {
+      for (const plat of platforms) {
+        await fetch('/api/queue', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ platforma: plat, caption, datum, cas, typ, status: datum ? 'scheduled' : 'pending' }),
+        });
+      }
+      setMsg('✓ Přidáno do fronty');
+      setCaption(''); setPlatforms([]); setDatum(''); setCas('');
+      onAdded();
+    } catch { setMsg('! Chyba při přidávání'); }
+    finally { setLoading(false); }
+  };
+
+  const platOptions = ['FB', 'IG', 'LI', 'TT', 'YT'];
+  const platFull: Record<string, string> = { FB: 'Facebook', IG: 'Instagram', LI: 'LinkedIn', TT: 'TikTok', YT: 'YouTube' };
+
+  return (
+    <div className="panel" style={{ gridColumn: 1, gridRow: '4 / 5' }}>
+      <div className="panel-header">
+        <div className="panel-accent" style={{ background: 'var(--accent-amber)' }} />
+        <span className="panel-title">▶ Rychlý Post</span>
+      </div>
+      <div className="panel-content" style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {/* Platforms */}
+        <div style={{ display: 'flex', gap: 4 }}>
+          {platOptions.map(p => (
+            <button
+              key={p}
+              className={`btn-terminal sm ${platforms.includes(platFull[p]) ? 'active' : ''}`}
+              onClick={() => togglePlat(platFull[p])}
+              style={platforms.includes(platFull[p]) ? { borderColor: platColor(p), color: platColor(p) } : {}}
+            >
+              {p}
+            </button>
+          ))}
+        </div>
+
+        {/* Date + time */}
+        <div style={{ display: 'flex', gap: 4 }}>
+          <input
+            type="date"
+            className="input-terminal"
+            value={datum}
+            onChange={e => setDatum(e.target.value)}
+            style={{ flex: 2 }}
+          />
+          <input
+            type="time"
+            className="input-terminal"
+            value={cas}
+            onChange={e => setCas(e.target.value)}
+            style={{ flex: 1 }}
+          />
+        </div>
+
+        {/* Typ */}
+        <select className="input-terminal" value={typ} onChange={e => setTyp(e.target.value)}>
+          <option value="post">post</option>
+          <option value="reel">reel</option>
+          <option value="story">story</option>
+          <option value="video">video</option>
+        </select>
+
+        {/* Caption */}
+        <textarea
+          className="input-terminal"
+          style={{ resize: 'none', flex: 1, minHeight: 60 }}
+          rows={4}
+          placeholder="> caption..."
+          value={caption}
+          onChange={e => setCaption(e.target.value)}
+        />
+
+        {/* Submit */}
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <button className="btn-terminal primary" onClick={submit} disabled={loading} style={{ flex: 1 }}>
+            {loading ? 'PŘIDÁVÁM_' : '+ PŘIDAT DO FRONTY'}
+          </button>
+        </div>
+
+        {msg && (
+          <div style={{ fontSize: 9, color: msg.startsWith('!') ? 'var(--accent-red)' : 'var(--accent-green)', letterSpacing: 0.5 }}>
+            {msg}
           </div>
         )}
       </div>
+    </div>
+  );
+}
 
-      {/* Bottom row: upcoming + platforms */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }} className="bottom-grid">
-        {/* Upcoming */}
-        <div style={{ background: "#111113", border: "1px solid #1e1e22", borderRadius: 12, padding: 20 }}>
-          <h2 style={{ fontSize: 14, fontWeight: 600, color: "#f0f0f0", marginBottom: 14 }}>Nadcházející příspěvky</h2>
-          {upcomingItems.length === 0 ? (
-            <p style={{ color: "#444", fontSize: 13 }}>Žádné naplánované příspěvky</p>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {upcomingItems.map((item) => (
-                <div key={item.id} style={{ background: "#0a0a0b", border: "1px solid #1e1e22", borderRadius: 8, padding: "10px 12px" }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <PlatformIcon platform={item.platforma} size={14} />
-                      <span style={{ fontSize: 11, color: getPlatformColor(item.platforma), fontWeight: 500 }}>{item.platforma}</span>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <StatusBadge status={item.status} />
-                    </div>
-                  </div>
-                  <p style={{ fontSize: 12, color: "#aaa", margin: "0 0 4px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-                    {item.caption || "Bez popisku"}
-                  </p>
-                  <div style={{ fontSize: 11, color: "#444" }}>{item.datum} {item.cas}</div>
-                </div>
-              ))}
-            </div>
-          )}
+// ── PANEL 5: VÝKON / HEATMAP ─────────────────────────────────────
+function FrameHeatmap({ items }: { items: QueueItem[] }) {
+  const days = 30;
+  const cells = Array.from({ length: days }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (days - 1 - i));
+    const ds = d.toISOString().split('T')[0];
+    const count = items.filter(it => it.datum === ds && it.status === 'posted').length;
+    return { date: ds, count, day: d.getDate() };
+  });
+
+  function heatClass(n: number) {
+    if (n === 0) return 'heatmap-cell h0';
+    if (n === 1) return 'heatmap-cell h1';
+    if (n === 2) return 'heatmap-cell h2';
+    return 'heatmap-cell h3';
+  }
+
+  // Platforms bar chart
+  const platStats = [
+    { name: 'FB', color: '#1877f2' },
+    { name: 'IG', color: '#e1306c' },
+    { name: 'LI', color: '#0077b5' },
+    { name: 'TT', color: '#69c9d0' },
+    { name: 'YT', color: '#ff0000' },
+  ].map(p => {
+    const count = items.filter(i => {
+      const pl = (i.platforma || '').toLowerCase();
+      return pl.includes(p.name.toLowerCase()) || pl.startsWith(p.name.toLowerCase());
+    }).length;
+    return { ...p, count };
+  });
+  const maxCount = Math.max(1, ...platStats.map(p => p.count));
+
+  return (
+    <div className="panel" style={{ gridColumn: 2, gridRow: '4 / 5' }}>
+      <div className="panel-header">
+        <div className="panel-accent" style={{ background: 'var(--accent-amber)' }} />
+        <span className="panel-title">▶ Výkon</span>
+        <span className="panel-count">posledních {days} dní</span>
+      </div>
+      <div className="panel-content" style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {/* Heatmap */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(10, 1fr)', gap: 3 }}>
+          {cells.map(c => (
+            <div
+              key={c.date}
+              className={heatClass(c.count)}
+              title={`${c.date}: ${c.count} postů`}
+              style={{ height: 16 }}
+            />
+          ))}
         </div>
 
-        {/* Platforms status */}
-        <div style={{ background: "#111113", border: "1px solid #1e1e22", borderRadius: 12, padding: 20 }}>
-          <h2 style={{ fontSize: 14, fontWeight: 600, color: "#f0f0f0", marginBottom: 14 }}>Platformy</h2>
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {platformStats.map((p) => (
-              <div key={p.name} style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <div style={{ width: 36, height: 36, borderRadius: 8, background: p.color + "18", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <PlatformIcon platform={p.name} size={18} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <span style={{ fontSize: 13, color: p.connected ? "#f0f0f0" : "#555", fontWeight: 500 }}>{p.name}</span>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ fontSize: 12, color: p.color, fontWeight: 600 }}>{p.count}</span>
-                      <span style={{ fontSize: 11, color: p.connected ? "#4ade80" : "#555" }}>
-                        {p.connected ? "● Připojeno" : "○ Nepřipojeno"}
-                      </span>
-                    </div>
-                  </div>
-                  <div style={{ marginTop: 4, height: 3, background: "#1e1e22", borderRadius: 2, overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${stats?.total ? (p.count / stats.total) * 100 : 0}%`, background: p.color, borderRadius: 2 }} />
-                  </div>
-                </div>
-              </div>
-            ))}
+        {/* Labels */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 8, color: 'var(--text-muted)' }}>
+          <span>-30d</span>
+          <span>-20d</span>
+          <span>-10d</span>
+          <span>dnes</span>
+        </div>
+
+        {/* Platform bars */}
+        <div style={{ borderTop: '1px solid var(--border-primary)', paddingTop: 8 }}>
+          <div style={{ fontSize: 9, color: 'var(--text-muted)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: 1 }}>
+            Celkem dle platformy
           </div>
+          {platStats.map(p => (
+            <div key={p.name} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+              <span style={{ fontSize: 9, color: 'var(--text-muted)', width: 22 }}>{p.name}</span>
+              <div style={{ flex: 1, height: 8, background: 'rgba(255,255,255,0.04)', borderRadius: 1, overflow: 'hidden' }}>
+                <div style={{
+                  height: '100%',
+                  width: `${(p.count / maxCount) * 100}%`,
+                  background: p.color,
+                  borderRadius: 1,
+                  transition: 'width 0.6s ease',
+                }} />
+              </div>
+              <span style={{ fontSize: 9, color: 'var(--text-secondary)', width: 16, textAlign: 'right' }}>{p.count}</span>
+            </div>
+          ))}
         </div>
       </div>
+    </div>
+  );
+}
 
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-        @media (max-width: 1024px) {
-          .week-grid { grid-template-columns: repeat(4, 1fr) !important; }
-        }
-        @media (max-width: 768px) {
-          .stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
-          .bottom-grid { grid-template-columns: 1fr !important; }
-          .week-grid { grid-template-columns: repeat(2, 1fr) !important; }
-        }
-        @media (max-width: 480px) {
-          .stats-grid { grid-template-columns: 1fr 1fr !important; }
-        }
-      `}</style>
+// ── PANEL 6: AI NÁPADY ────────────────────────────────────────────
+function FrameAI() {
+  const [topic, setTopic] = useState('');
+  const [platform, setPlatform] = useState('LinkedIn');
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState('');
+
+  const generate = async () => {
+    if (!topic) return;
+    setLoading(true); setResult('');
+    try {
+      const res = await fetch('/api/ai-caption', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topic, platform }),
+      });
+      const data = await res.json();
+      setResult(data.caption || '');
+    } catch { setResult('! Chyba při generování'); }
+    finally { setLoading(false); }
+  };
+
+  const platforms = ['Facebook', 'Instagram', 'LinkedIn', 'TikTok', 'YouTube Shorts'];
+
+  return (
+    <div className="panel" style={{ gridColumn: 3, gridRow: '4 / 5' }}>
+      <div className="panel-header">
+        <div className="panel-accent" style={{ background: 'var(--accent-gold)' }} />
+        <span className="panel-title">▶ AI Nápady</span>
+        <span className="panel-count" style={{ marginLeft: 'auto', fontSize: 8, color: 'var(--text-muted)' }}>Gemini</span>
+      </div>
+      <div className="panel-content" style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <input
+          className="input-terminal"
+          placeholder="> téma..."
+          value={topic}
+          onChange={e => setTopic(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && generate()}
+        />
+        <div style={{ display: 'flex', gap: 4 }}>
+          <select className="input-terminal" value={platform} onChange={e => setPlatform(e.target.value)} style={{ flex: 1 }}>
+            {platforms.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+          <button className="btn-terminal primary" onClick={generate} disabled={loading} style={{ flexShrink: 0 }}>
+            {loading ? <span className="blink-cursor">GENERATING</span> : '✨ GENEROVAT'}
+          </button>
+        </div>
+
+        {result && (
+          <div style={{
+            flex: 1,
+            background: 'rgba(201,169,110,0.04)',
+            border: '1px solid var(--border-primary)',
+            padding: '8px',
+            fontSize: 10,
+            color: 'var(--text-primary)',
+            lineHeight: 1.6,
+            overflowY: 'auto',
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word',
+            animation: 'fadeIn 0.3s ease',
+          }}>
+            {result}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── MAIN DASHBOARD ─────────────────────────────────────────────────
+export default function DashboardPage() {
+  const [items, setItems] = useState<QueueItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchItems = useCallback(async () => {
+    try {
+      const res = await fetch('/api/queue');
+      if (res.ok) {
+        const data = await res.json();
+        setItems(data.items || []);
+      }
+    } catch {}
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => {
+    fetchItems();
+    const interval = setInterval(fetchItems, 60000);
+    return () => clearInterval(interval);
+  }, [fetchItems]);
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)', fontSize: 12, letterSpacing: 2 }}>
+        NAČÍTÁM DATA_
+      </div>
+    );
+  }
+
+  return (
+    <div style={{
+      position: 'absolute',
+      inset: 0,
+      display: 'grid',
+      gridTemplateColumns: '1fr 1.4fr 1fr',
+      gridTemplateRows: '1fr 1fr 1fr 1fr',
+      gap: 1,
+      background: 'var(--border-primary)',
+      padding: 1,
+    }}>
+      <FrameQueue items={items} />
+      <FrameCalendar items={items} />
+      <FramePlatforms items={items} />
+      <FrameQuickPost onAdded={fetchItems} />
+      <FrameHeatmap items={items} />
+      <FrameAI />
     </div>
   );
 }
