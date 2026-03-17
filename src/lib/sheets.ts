@@ -1,5 +1,6 @@
 import { google } from 'googleapis'
 import { JWT } from 'google-auth-library'
+import fs from 'fs'
 
 export const SPREADSHEET_ID = '12LBNKEFQfOwdE2FAo4aAp-QCP6QZImARGjKgS5sBGjE'
 
@@ -10,9 +11,8 @@ export function getAuth(): JWT {
     const json = Buffer.from(process.env.GOOGLE_SA_BASE64, 'base64').toString('utf-8')
     credentials = JSON.parse(json)
   } else {
-    // fallback: local file on VPS
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    credentials = require('/root/social_poster/service_account.json')
+    const path = '/root/social_poster/service_account.json'
+    credentials = JSON.parse(fs.readFileSync(path, 'utf-8'))
   }
 
   return new JWT({
