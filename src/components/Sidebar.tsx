@@ -45,7 +45,7 @@ const platforms = [
   { name: "Instagram", color: "#E1306C", connected: true },
   { name: "LinkedIn", color: "#0A66C2", connected: true },
   { name: "TikTok", color: "#FF0050", connected: false },
-  { name: "YouTube", color: "#FF0000", connected: false },
+  { name: "YouTube", color: "#FF0000", connected: true },
 ];
 
 export default function Sidebar() {
