@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
-export default function TvorbaRedirect() {
+export default function TvorbaPage() {
   redirect("/novy");
 }

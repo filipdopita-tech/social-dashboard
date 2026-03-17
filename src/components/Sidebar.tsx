@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 
 const navItems = [
@@ -50,6 +50,7 @@ const platforms = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
@@ -90,18 +91,14 @@ export default function Sidebar() {
               </svg>
             </div>
             <div>
-              <div style={{ fontWeight: 700, fontSize: 17, color: "#f0f0f0", letterSpacing: "-0.01em" }}>
-                OneFlow
-              </div>
-              <div style={{ fontSize: 11, color: "#c9a96e", fontWeight: 500, letterSpacing: "0.05em", textTransform: "uppercase" }}>
-                Social Planner
-              </div>
+              <div style={{ fontWeight: 700, fontSize: 17, color: "#f0f0f0", letterSpacing: "-0.01em" }}>OneFlow</div>
+              <div style={{ fontSize: 11, color: "#c9a96e", fontWeight: 500, letterSpacing: "0.05em", textTransform: "uppercase" }}>Social Planner</div>
             </div>
           </div>
         </div>
 
         {/* Nav */}
-        <nav style={{ padding: "0 12px", flex: 1 }}>
+        <nav style={{ padding: "0 12px", flex: 1, overflowY: "auto" }}>
           <div style={{ fontSize: 10, color: "#555", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8, paddingLeft: 12 }}>
             Navigace
           </div>
@@ -114,18 +111,13 @@ export default function Sidebar() {
                   href={item.href}
                   onClick={() => setMobileOpen(false)}
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    padding: "10px 14px",
-                    borderRadius: 8,
-                    transition: "all 0.15s",
+                    display: "flex", alignItems: "center", gap: 10,
+                    padding: "10px 14px", borderRadius: 8, transition: "all 0.15s",
                     textDecoration: "none",
                     background: isActive ? "rgba(201, 169, 110, 0.1)" : "transparent",
                     color: isActive ? "#c9a96e" : "#888",
                     borderLeft: isActive ? "2px solid #c9a96e" : "2px solid transparent",
                   }}
-                  className="sidebar-link"
                 >
                   <span style={{ color: isActive ? "#c9a96e" : "#555" }}>{item.icon}</span>
                   <span style={{ fontWeight: isActive ? 600 : 400, fontSize: 14 }}>{item.label}</span>
@@ -134,10 +126,32 @@ export default function Sidebar() {
             })}
           </div>
 
-          {/* Platforms */}
-          <div style={{ marginTop: 28 }}>
+          {/* Quick Actions */}
+          <div style={{ marginTop: 24 }}>
             <div style={{ fontSize: 10, color: "#555", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10, paddingLeft: 12 }}>
-              Platformy
+              Rychlé akce
+            </div>
+            <button
+              onClick={() => { router.push("/novy"); setMobileOpen(false); }}
+              style={{
+                width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                padding: "10px 16px", borderRadius: 8, cursor: "pointer",
+                background: "linear-gradient(135deg, #c9a96e, #a88854)",
+                border: "none", color: "#0a0a0b", fontWeight: 700, fontSize: 13,
+                transition: "opacity 0.15s",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.9")}
+              onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14"/></svg>
+              + Nový příspěvek
+            </button>
+          </div>
+
+          {/* Platforms */}
+          <div style={{ marginTop: 24 }}>
+            <div style={{ fontSize: 10, color: "#555", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10, paddingLeft: 12 }}>
+              Připojené platformy
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
               {platforms.map((p) => (
@@ -157,9 +171,7 @@ export default function Sidebar() {
 
         {/* Footer */}
         <div style={{ padding: "16px 24px", borderTop: "1px solid #1e1e22" }}>
-          <div style={{ fontSize: 11, color: "#444", textAlign: "center" }}>
-            OneFlow Social Manager v2.0
-          </div>
+          <div style={{ fontSize: 11, color: "#444", textAlign: "center" }}>OneFlow Social Manager v2.0</div>
         </div>
       </aside>
 
