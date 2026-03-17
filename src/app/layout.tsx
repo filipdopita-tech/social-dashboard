@@ -5,6 +5,10 @@ import Sidebar from "@/components/Sidebar";
 export const metadata: Metadata = {
   title: "OneFlow | Social Planner",
   description: "Professional social media planner for OneFlow",
+  icons: {
+    icon: '/icon.png',
+    apple: '/apple-touch-icon.png',
+  },
   robots: {
     index: false,
     follow: false,
