@@ -7,31 +7,23 @@ import './globals.css';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
-interface Stats {
-  total: number;
-  pending: number;
-  scheduled: number;
-  posted: number;
-  todayPosts: number;
-  weekPosts: number;
-}
+const NAV_ITEMS = [
+  { label: 'Dashboard',   path: '/',          icon: '◈' },
+  { label: 'Fronta',      path: '/fronta',    icon: '☰' },
+  { label: 'Integrace',   path: '/integrace', icon: '⬡' },
+];
 
-const PLATFORM_COLORS: Record<string, string> = {
-  Facebook: '#1877f2', FB: '#1877f2',
-  Instagram: '#e1306c', IG: '#e1306c',
-  LinkedIn: '#0077b5', LI: '#0077b5',
-  TikTok: '#010101', TT: '#010101',
-  YouTube: '#ff0000', YT: '#ff0000',
-};
+const PLATFORMS = [
+  { id: 'fb',  label: 'Facebook',   color: '#1877f2', status: 'connected' },
+  { id: 'ig',  label: 'Instagram',  color: '#e1306c', status: 'connected' },
+  { id: 'li',  label: 'LinkedIn',   color: '#0077b5', status: 'connected' },
+  { id: 'tt',  label: 'TikTok',     color: '#f59e0b', status: 'pending'   },
+  { id: 'yt',  label: 'YouTube',    color: '#ff0000', status: 'connected' },
+];
 
 function Sidebar({ theme, toggleTheme }: { theme: string; toggleTheme: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
-
-  const navItems = [
-    { label: 'Dashboard', path: '/', icon: '◈' },
-    { label: 'Fronta', path: '/fronta', icon: '☰' },
-  ];
 
   return (
     <div className="sidebar">
@@ -46,7 +38,7 @@ function Sidebar({ theme, toggleTheme }: { theme: string; toggleTheme: () => voi
 
       {/* Nav */}
       <nav className="sidebar-nav">
-        {navItems.map(item => (
+        {NAV_ITEMS.map(item => (
           <button
             key={item.path}
             className={`nav-item${pathname === item.path ? ' active' : ''}`}
@@ -60,12 +52,50 @@ function Sidebar({ theme, toggleTheme }: { theme: string; toggleTheme: () => voi
         <button
           className="nav-item-add"
           onClick={() => router.push('/novy')}
-          style={{ marginTop: 8 }}
+          style={{ marginTop: 10 }}
         >
           <span style={{ fontSize: 16, color: '#6b7a99', lineHeight: 1 }}>+</span>
           Nový příspěvek
         </button>
       </nav>
+
+      {/* Platform status mini-list */}
+      <div style={{
+        margin: '16px 0',
+        padding: '14px 16px',
+        borderTop: '1px solid var(--sidebar-border)',
+        borderBottom: '1px solid var(--sidebar-border)',
+      }}>
+        <div style={{
+          fontSize: 9, color: 'var(--text-muted)', letterSpacing: 1.2,
+          textTransform: 'uppercase', marginBottom: 10, fontWeight: 600,
+        }}>
+          Propojené sítě
+        </div>
+        {PLATFORMS.map(p => (
+          <div key={p.id} style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            marginBottom: 7, cursor: 'pointer',
+          }}
+          onClick={() => router.push('/integrace')}
+          >
+            <span style={{
+              width: 7, height: 7, borderRadius: '50%',
+              background: p.status === 'connected' ? p.color : '#f59e0b',
+              flexShrink: 0,
+              boxShadow: p.status === 'connected' ? `0 0 6px ${p.color}88` : 'none',
+            }} />
+            <span style={{ fontSize: 11, color: 'var(--text-secondary)', flex: 1 }}>{p.label}</span>
+            <span style={{
+              fontSize: 9, fontWeight: 600,
+              color: p.status === 'connected' ? '#10b981' : '#f59e0b',
+              letterSpacing: 0.5,
+            }}>
+              {p.status === 'connected' ? '✓' : '…'}
+            </span>
+          </div>
+        ))}
+      </div>
 
       {/* Bottom */}
       <div className="sidebar-bottom">
@@ -103,6 +133,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <title>Social Dashboard — OneFlow</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <link rel="icon" href="/icon.png" />
       </head>
       <body style={{ fontFamily: 'Inter, sans-serif' }}>
         {mounted && (
