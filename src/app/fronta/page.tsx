@@ -18,38 +18,50 @@ const PLATFORM_COLORS: Record<string, string> = {
   Facebook: '#1877f2', FB: '#1877f2',
   Instagram: '#e1306c', IG: '#e1306c',
   LinkedIn: '#0077b5', LI: '#0077b5',
-  TikTok: '#69c9d0', TT: '#69c9d0',
+  TikTok: '#010101', TT: '#010101',
   YouTube: '#ff0000', YT: '#ff0000',
 };
 
-function platColor(p: string) { return PLATFORM_COLORS[p] || '#6a7a8a'; }
-function platShort(p: string) {
-  if (!p) return '?';
-  const map: Record<string, string> = { Facebook: 'FB', Instagram: 'IG', LinkedIn: 'LI', TikTok: 'TT', YouTube: 'YT' };
-  return map[p] || (p.length <= 3 ? p.toUpperCase() : p.slice(0,2).toUpperCase());
+function platColor(p: string): string {
+  return PLATFORM_COLORS[p] || '#6b7a99';
 }
 
-function StatusTag({ status }: { status: string }) {
+function platShort(p: string): string {
+  if (!p) return '?';
+  const map: Record<string, string> = {
+    Facebook: 'FB', Instagram: 'IG', LinkedIn: 'LI', TikTok: 'TT', YouTube: 'YT',
+  };
+  return map[p] || (p.length <= 3 ? p.toUpperCase() : p.slice(0, 2).toUpperCase());
+}
+
+function StatusBadge({ status }: { status: string }) {
   const s = (status || '').toLowerCase();
-  const cls = s === 'scheduled' ? 'tag tag-sched' :
-              s === 'posted' ? 'tag tag-posted' :
-              s === 'error' || s === 'err' ? 'tag tag-err' :
-              'tag tag-pend';
-  const label = s === 'scheduled' ? 'SCHED' : s === 'posted' ? 'POSTED' : (s === 'error' || s === 'err') ? 'ERR' : 'PEND';
+  const cls =
+    s === 'scheduled' ? 'badge badge-scheduled' :
+    s === 'posted' ? 'badge badge-posted' :
+    s === 'error' || s === 'err' ? 'badge badge-error' :
+    'badge badge-pending';
+  const label =
+    s === 'scheduled' ? 'Naplánováno' :
+    s === 'posted' ? 'Zveřejněno' :
+    s === 'error' || s === 'err' ? 'Chyba' :
+    'Čeká';
   return <span className={cls}>{label}</span>;
 }
 
 export default function FrontaPage() {
   const [items, setItems] = useState<QueueItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<string>('ALL');
-  const [platFilter, setPlatFilter] = useState<string>('ALL');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [deleting, setDeleting] = useState<string | null>(null);
 
   const fetchItems = useCallback(async () => {
     try {
       const res = await fetch('/api/queue');
-      if (res.ok) { const data = await res.json(); setItems(data.items || []); }
+      if (res.ok) {
+        const data = await res.json();
+        setItems(data.items || []);
+      }
     } catch {}
     finally { setLoading(false); }
   }, []);
@@ -68,7 +80,7 @@ export default function FrontaPage() {
   };
 
   const deleteItem = async (item: QueueItem) => {
-    if (!confirm(`Smazat #${item.id}?`)) return;
+    if (!confirm(`Opravdu smazat příspěvek #${item.id}?`)) return;
     setDeleting(item.id);
     try {
       await fetch(`/api/queue?id=${item.id}&rowIndex=${item.rowIndex}`, { method: 'DELETE' });
@@ -77,182 +89,149 @@ export default function FrontaPage() {
     finally { setDeleting(null); }
   };
 
-  const statusFilters = ['ALL', 'PEND', 'SCHED', 'POSTED', 'ERR'];
-  const platFilters = ['ALL', 'FB', 'IG', 'LI', 'TT', 'YT'];
+  const STATUS_FILTERS = [
+    { id: 'all', label: 'Vše' },
+    { id: 'pending', label: 'Pending' },
+    { id: 'scheduled', label: 'Scheduled' },
+    { id: 'posted', label: 'Posted' },
+    { id: 'error', label: 'Error' },
+  ];
 
   const filtered = items.filter(item => {
+    if (statusFilter === 'all') return true;
     const s = (item.status || '').toLowerCase();
-    const statusOk = statusFilter === 'ALL' ||
-      (statusFilter === 'PEND' && s === 'pending') ||
-      (statusFilter === 'SCHED' && s === 'scheduled') ||
-      (statusFilter === 'POSTED' && s === 'posted') ||
-      (statusFilter === 'ERR' && (s === 'error' || s === 'err'));
-    const pl = (item.platforma || '').toLowerCase();
-    const platOk = platFilter === 'ALL' || pl.includes(platFilter.toLowerCase()) ||
-      (platFilter === 'FB' && pl.includes('facebook')) ||
-      (platFilter === 'IG' && pl.includes('instagram')) ||
-      (platFilter === 'LI' && pl.includes('linkedin')) ||
-      (platFilter === 'TT' && pl.includes('tiktok')) ||
-      (platFilter === 'YT' && pl.includes('youtube'));
-    return statusOk && platOk;
+    if (statusFilter === 'error') return s === 'error' || s === 'err';
+    return s === statusFilter;
   });
 
+  const getNextStatus = (current: string) => {
+    const s = (current || '').toLowerCase();
+    if (s === 'pending') return 'scheduled';
+    if (s === 'scheduled') return 'posted';
+    return 'pending';
+  };
+
   return (
-    <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', background: 'var(--bg-panel)' }}>
+    <div className="page-container fade-in">
       {/* Header */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        padding: '0 12px',
-        height: 36,
-        background: 'var(--bg-header)',
-        borderBottom: '1px solid var(--border-primary)',
-        gap: 8,
-        flexShrink: 0,
-      }}>
-        <div style={{ width: 3, height: 14, background: 'var(--accent-gold)', borderRadius: 1 }} />
-        <span style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 2, color: 'var(--text-secondary)' }}>
-          Fronta příspěvků
-        </span>
-        <span style={{ fontSize: 9, color: 'var(--text-muted)', background: 'rgba(255,255,255,0.04)', padding: '1px 6px', borderRadius: 2 }}>
-          {filtered.length}/{items.length}
-        </span>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+        <div>
+          <h1 className="page-title">Fronta příspěvků</h1>
+          <p className="page-subtitle">
+            {filtered.length} z {items.length} příspěvků
+          </p>
+        </div>
+        <button className="btn btn-ghost btn-sm" onClick={fetchItems}>
+          ↻ Obnovit
+        </button>
+      </div>
 
-        <span className="sep" style={{ marginLeft: 8 }}>|</span>
-
-        {/* Status filter */}
-        {statusFilters.map(f => (
-          <button key={f} className={`btn-terminal sm ${statusFilter === f ? 'active' : ''}`} onClick={() => setStatusFilter(f)}>
-            {f}
-          </button>
-        ))}
-
-        <span className="sep">|</span>
-
-        {/* Platform filter */}
-        {platFilters.map(f => (
+      {/* Filter bar */}
+      <div className="filter-bar" style={{ marginBottom: 20 }}>
+        {STATUS_FILTERS.map(f => (
           <button
-            key={f}
-            className={`btn-terminal sm ${platFilter === f ? 'active' : ''}`}
-            onClick={() => setPlatFilter(f)}
-            style={platFilter === f && f !== 'ALL' ? { borderColor: platColor(f), color: platColor(f) } : {}}
+            key={f.id}
+            className={`filter-pill${statusFilter === f.id ? ' active' : ''}`}
+            onClick={() => setStatusFilter(f.id)}
           >
-            {f}
+            {f.label}
           </button>
         ))}
-
-        <div style={{ flex: 1 }} />
-        <button className="btn-terminal sm" onClick={fetchItems}>↻ OBNOVIT</button>
       </div>
 
-      {/* Column headers */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: '36px 70px 90px 55px 60px 1fr 120px 70px 100px',
-        gap: 0,
-        padding: '4px 12px',
-        background: 'var(--bg-header)',
-        borderBottom: '1px solid var(--border-primary)',
-        flexShrink: 0,
-      }}>
-        {['#', 'PLATFORMA', 'DATUM', 'ČAS', 'TYP', 'CAPTION', 'MEDIA', 'STATUS', 'AKCE'].map(col => (
-          <div key={col} style={{ fontSize: 8, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1.5, padding: '0 4px' }}>
-            {col}
+      {/* Table card */}
+      <div className="card">
+        {loading ? (
+          <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)', fontSize: 14 }}>
+            Načítám…
           </div>
-        ))}
-      </div>
+        ) : filtered.length === 0 ? (
+          <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)', fontSize: 14 }}>
+            Žádné příspěvky odpovídají filtru.
+          </div>
+        ) : (
+          <div className="table-container">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Platforma</th>
+                  <th>Datum</th>
+                  <th>Čas</th>
+                  <th>Caption</th>
+                  <th>Status</th>
+                  <th style={{ textAlign: 'right' }}>Akce</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((item, idx) => (
+                  <tr
+                    key={item.id}
+                    style={{ opacity: deleting === item.id ? 0.4 : 1, transition: 'opacity 0.2s' }}
+                  >
+                    {/* # */}
+                    <td style={{ color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>
+                      {idx + 1}
+                    </td>
 
-      {/* Table */}
-      <div style={{ flex: 1, overflowY: 'auto' }}>
-        {loading && (
-          <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 11, letterSpacing: 2 }}>
-            NAČÍTÁM_
+                    {/* Platform */}
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                        <span
+                          className="plat-dot"
+                          style={{ background: platColor(item.platforma) }}
+                        />
+                        <span style={{ fontWeight: 500 }}>{platShort(item.platforma)}</span>
+                      </div>
+                    </td>
+
+                    {/* Datum */}
+                    <td style={{ color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                      {item.datum || '—'}
+                    </td>
+
+                    {/* Čas */}
+                    <td style={{ color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                      {item.cas || '—'}
+                    </td>
+
+                    {/* Caption */}
+                    <td>
+                      <div className="caption-cell" title={item.caption}>
+                        {item.caption || '—'}
+                      </div>
+                    </td>
+
+                    {/* Status */}
+                    <td>
+                      <StatusBadge status={item.status} />
+                    </td>
+
+                    {/* Akce */}
+                    <td>
+                      <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                        <button
+                          className="btn-icon"
+                          title={`Změnit na: ${getNextStatus(item.status)}`}
+                          onClick={() => updateStatus(item, getNextStatus(item.status))}
+                        >
+                          ↺
+                        </button>
+                        <button
+                          className="btn-icon danger"
+                          title="Smazat"
+                          onClick={() => deleteItem(item)}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
-        {!loading && filtered.length === 0 && (
-          <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 10 }}>
-            — žádné příspěvky odpovídají filtru —
-          </div>
-        )}
-        {filtered.map((item, idx) => (
-          <div
-            key={item.id}
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '36px 70px 90px 55px 60px 1fr 120px 70px 100px',
-              gap: 0,
-              padding: '5px 12px',
-              borderBottom: '1px solid rgba(19,30,42,0.5)',
-              background: idx % 2 === 1 ? 'rgba(255,255,255,0.006)' : 'transparent',
-              alignItems: 'center',
-              transition: 'background 0.1s ease',
-              opacity: deleting === item.id ? 0.4 : 1,
-            }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(201,169,110,0.04)')}
-            onMouseLeave={e => (e.currentTarget.style.background = idx % 2 === 1 ? 'rgba(255,255,255,0.006)' : 'transparent')}
-          >
-            {/* # */}
-            <div style={{ fontSize: 9, color: 'var(--text-muted)', padding: '0 4px' }}>#{idx + 1}</div>
-
-            {/* Platform */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '0 4px' }}>
-              <div style={{ width: 6, height: 6, borderRadius: '50%', background: platColor(item.platforma), flexShrink: 0 }} />
-              <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>{platShort(item.platforma)}</span>
-            </div>
-
-            {/* Datum */}
-            <div style={{ fontSize: 10, color: 'var(--text-secondary)', padding: '0 4px', fontVariantNumeric: 'tabular-nums' }}>
-              {item.datum || '—'}
-            </div>
-
-            {/* Čas */}
-            <div style={{ fontSize: 10, color: 'var(--text-muted)', padding: '0 4px', fontVariantNumeric: 'tabular-nums' }}>
-              {item.cas || '—'}
-            </div>
-
-            {/* Typ */}
-            <div style={{ fontSize: 9, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, padding: '0 4px' }}>
-              {item.typ || 'post'}
-            </div>
-
-            {/* Caption */}
-            <div style={{ fontSize: 11, color: 'var(--text-primary)', padding: '0 4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {item.caption || '—'}
-            </div>
-
-            {/* Media */}
-            <div style={{ fontSize: 9, color: 'var(--text-muted)', padding: '0 4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {item.mediaFile || '—'}
-            </div>
-
-            {/* Status */}
-            <div style={{ padding: '0 4px' }}>
-              <StatusTag status={item.status} />
-            </div>
-
-            {/* Actions */}
-            <div style={{ display: 'flex', gap: 3, padding: '0 4px' }}>
-              <button
-                className="btn-terminal sm"
-                title="Změnit status"
-                onClick={() => {
-                  const s = (item.status || '').toLowerCase();
-                  const next = s === 'pending' ? 'scheduled' : s === 'scheduled' ? 'posted' : 'pending';
-                  updateStatus(item, next);
-                }}
-              >
-                ↺
-              </button>
-              <button
-                className="btn-terminal sm danger"
-                title="Smazat"
-                onClick={() => deleteItem(item)}
-              >
-                ✕
-              </button>
-            </div>
-          </div>
-        ))}
       </div>
     </div>
   );
